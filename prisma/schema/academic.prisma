@@ -1,0 +1,476 @@
+// ───────────────────────── Student information system & academic operations ─────────────────────────
+
+enum StudentStatus {
+  ACTIVE
+  ON_LEAVE
+  SUSPENDED
+  WITHDRAWN
+  DISCONTINUED
+  GRADUATED
+}
+
+enum Gender {
+  FEMALE
+  MALE
+  OTHER
+  UNDISCLOSED
+}
+
+enum GuardianRelation {
+  FATHER
+  MOTHER
+  GUARDIAN
+  SPOUSE
+  SIBLING
+  OTHER
+}
+
+enum TermStatus {
+  PLANNED
+  REGISTRATION
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum OfferingStatus {
+  PLANNED
+  OPEN
+  CLOSED
+  CANCELLED
+  COMPLETED
+}
+
+enum RegistrationStatus {
+  REGISTERED
+  DROPPED
+  WITHDRAWN
+  COMPLETED
+}
+
+enum AttemptType {
+  REGULAR
+  REPEAT
+  IMPROVEMENT
+}
+
+enum AttendanceMark {
+  PRESENT
+  ABSENT
+  LATE
+  EXCUSED
+  ON_DUTY
+  MEDICAL
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  HELD
+  CANCELLED
+}
+
+enum RoomType {
+  CLASSROOM
+  LAB
+  SEMINAR_HALL
+  EXAM_HALL
+  AUDITORIUM
+  OTHER
+}
+
+enum SessionKind {
+  LECTURE
+  TUTORIAL
+  LAB
+}
+
+enum CalendarEventKind {
+  TERM
+  HOLIDAY
+  EXAMINATION
+  REGISTRATION
+  EVENT
+  DEADLINE
+}
+
+enum CurriculumStatus {
+  DRAFT
+  ACTIVE
+  RETIRED
+}
+
+enum CurriculumCategory {
+  MANDATORY
+  ELECTIVE
+}
+
+/// A cohort admitted to a programme in a given year (e.g. BCA 2024–27).
+model Batch {
+  id             String      @id @default(cuid())
+  programId      String
+  regulationId   String
+  curriculumId   String?
+  code           String      @unique // BCA-2024
+  name           String
+  admissionYear  Int
+  graduationYear Int
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  deletedAt      DateTime?
+  program        Program     @relation(fields: [programId], references: [id])
+  regulation     Regulation  @relation(fields: [regulationId], references: [id])
+  curriculum     Curriculum? @relation(fields: [curriculumId], references: [id])
+  students       Student[]
+  offerings      CourseOffering[]
+  feeStructures  FeeStructure[]
+  admissionSeats AdmissionSeat[]
+
+  @@index([programId, admissionYear])
+}
+
+model Student {
+  id               String        @id @default(cuid())
+  userId           String?       @unique
+  studentNo        String        @unique // institution-generated, e.g. 24BCA0007
+  admissionNo      String        @unique
+  registrationNo   String?       @unique // university registration number, when issued
+  firstName        String
+  lastName         String
+  dateOfBirth      DateTime?     @db.Date
+  gender           Gender?
+  email            String
+  phone            String?
+  address          Json? // { line1, line2, city, state, postalCode, country }
+  nationality      String?
+  category         String? // admission/reservation category where institutionally required
+  bloodGroup       String?
+  emergencyContact Json? // { name, relation, phone }
+  photoAssetId     String?
+  programId        String
+  batchId          String
+  departmentId     String // denormalised from the programme; drives scope checks
+  campusId         String?
+  specialization   String?
+  section          String?
+  currentSemester  Int           @default(1)
+  status           StudentStatus @default(ACTIVE)
+  admittedOn       DateTime      @db.Date
+  graduatedOn      DateTime?     @db.Date
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  deletedAt        DateTime?
+  user             User?         @relation("StudentAccount", fields: [userId], references: [id])
+  program          Program       @relation(fields: [programId], references: [id])
+  batch            Batch         @relation(fields: [batchId], references: [id])
+  department       Department    @relation(fields: [departmentId], references: [id])
+  campus           Campus?       @relation(fields: [campusId], references: [id])
+  guardians        Guardian[]
+  statusHistory    StudentStatusChange[]
+  registrations    CourseRegistration[]
+  attendance       AttendanceRecord[]
+  examRegistrations ExamRegistration[]
+  marks            Mark[]
+  courseResults    CourseResult[]
+  termResults      TermResult[]
+  revaluations     RevaluationRequest[]
+  credentials      IssuedCredential[]
+  invoices         Invoice[]
+  payments         Payment[]
+  concessions      Concession[]
+  scholarshipApplications ScholarshipApplication[]
+  itemViews        LearningItemView[]
+  submissions      Submission[]
+  quizAttempts     QuizAttempt[]
+  libraryLoans     LibraryLoan[]
+  libraryHolds     LibraryHold[]
+  hostelAllocations HostelAllocation[]
+  transportPasses  TransportPass[]
+  documents        StudentDocument[]
+  admissionApplication AdmissionApplication?
+  placementApplications PlacementApplication[]
+  alumniProfile    AlumniProfile?
+
+  @@index([departmentId, status])
+  @@index([programId, batchId])
+  @@index([batchId, section])
+  @@index([lastName, firstName])
+  @@index([firstName(ops: raw("gin_trgm_ops")), lastName(ops: raw("gin_trgm_ops"))], type: Gin, map: "Student_name_trgm_idx")
+}
+
+model Guardian {
+  id              String           @id @default(cuid())
+  studentId       String
+  userId          String?
+  name            String
+  relation        GuardianRelation
+  phone           String?
+  email           String?
+  occupation      String?
+  isPrimary       Boolean          @default(false)
+  canViewAcademic Boolean          @default(true)
+  canViewFinance  Boolean          @default(true)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  student         Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  user            User?            @relation("GuardianAccount", fields: [userId], references: [id])
+
+  @@unique([studentId, userId])
+  @@index([userId])
+}
+
+/// Every academic-status change, with the reason and who made it. Append-only.
+model StudentStatusChange {
+  id                 String        @id @default(cuid())
+  studentId          String
+  from               StudentStatus
+  to                 StudentStatus
+  reason             String
+  effectiveOn        DateTime      @db.Date
+  changedById        String?
+  workflowInstanceId String?
+  createdAt          DateTime      @default(now())
+  student            Student       @relation(fields: [studentId], references: [id])
+
+  @@index([studentId, createdAt])
+}
+
+/// A teaching period of an academic year (e.g. 2026-27 Odd term).
+model AcademicTerm {
+  id                   String          @id @default(cuid())
+  academicYearId       String
+  code                 String          @unique // 2026-27-ODD
+  name                 String
+  termType             TermType
+  startDate            DateTime        @db.Date
+  endDate              DateTime        @db.Date
+  registrationOpensAt  DateTime?
+  registrationClosesAt DateTime?
+  addDropUntil         DateTime?
+  status               TermStatus      @default(PLANNED)
+  isCurrent            Boolean         @default(false)
+  createdAt            DateTime        @default(now())
+  updatedAt            DateTime        @updatedAt
+  academicYear         AcademicYear    @relation(fields: [academicYearId], references: [id])
+  offerings            CourseOffering[]
+  events               CalendarEvent[]
+  examSessions         ExaminationSession[]
+  resultRuns           ResultRun[]
+  invoices             Invoice[]
+
+  @@index([academicYearId])
+}
+
+model CalendarEvent {
+  id          String            @id @default(cuid())
+  termId      String?
+  title       String
+  kind        CalendarEventKind
+  startDate   DateTime          @db.Date
+  endDate     DateTime          @db.Date
+  isHoliday   Boolean           @default(false)
+  description String?
+  createdAt   DateTime          @default(now())
+  term        AcademicTerm?     @relation(fields: [termId], references: [id])
+
+  @@index([startDate, endDate])
+}
+
+model Building {
+  id        String    @id @default(cuid())
+  campusId  String?
+  code      String    @unique
+  name      String
+  createdAt DateTime  @default(now())
+  deletedAt DateTime?
+  campus    Campus?   @relation(fields: [campusId], references: [id])
+  rooms     Room[]
+}
+
+model Room {
+  id           String           @id @default(cuid())
+  buildingId   String?
+  code         String           @unique
+  name         String
+  type         RoomType         @default(CLASSROOM)
+  capacity     Int
+  examCapacity Int?
+  isActive     Boolean          @default(true)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  building     Building?        @relation(fields: [buildingId], references: [id])
+  slots        TimetableSlot[]
+  meetings     ClassMeeting[]
+  examSeats    ExamSeat[]
+  duties       InvigilationDuty[]
+}
+
+/// A course taught in a term, to one section.
+model CourseOffering {
+  id            String               @id @default(cuid())
+  courseId      String
+  termId        String
+  batchId       String?
+  section       String               @default("A")
+  capacity      Int
+  status        OfferingStatus       @default(PLANNED)
+  notes         String?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  course        Course               @relation(fields: [courseId], references: [id])
+  term          AcademicTerm         @relation(fields: [termId], references: [id])
+  batch         Batch?               @relation(fields: [batchId], references: [id])
+  instructors   OfferingInstructor[]
+  registrations CourseRegistration[]
+  slots         TimetableSlot[]
+  meetings      ClassMeeting[]
+  components    AssessmentComponent[]
+  modules       CourseModule[]
+  announcements CourseAnnouncement[]
+  assignments   Assignment[]
+  quizzes       Quiz[]
+
+  @@unique([courseId, termId, section])
+  @@index([termId])
+}
+
+model OfferingInstructor {
+  offeringId String
+  userId     String
+  isPrimary  Boolean        @default(false)
+  offering   CourseOffering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  user       User           @relation("Teaching", fields: [userId], references: [id])
+
+  @@id([offeringId, userId])
+  @@index([userId])
+}
+
+model CourseRegistration {
+  id            String             @id @default(cuid())
+  studentId     String
+  offeringId    String
+  status        RegistrationStatus @default(REGISTERED)
+  attemptType   AttemptType        @default(REGULAR)
+  registeredAt  DateTime           @default(now())
+  droppedAt     DateTime?
+  registeredById String?
+  student       Student            @relation(fields: [studentId], references: [id])
+  offering      CourseOffering     @relation(fields: [offeringId], references: [id])
+
+  @@unique([studentId, offeringId])
+  @@index([offeringId, status])
+}
+
+/// Weekly recurring class in the timetable.
+model TimetableSlot {
+  id         String         @id @default(cuid())
+  offeringId String
+  dayOfWeek  Int // 1 = Monday … 7 = Sunday
+  startTime  String // "09:00" (institution time zone)
+  endTime    String
+  roomId     String?
+  kind       SessionKind    @default(LECTURE)
+  createdAt  DateTime       @default(now())
+  offering   CourseOffering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  room       Room?          @relation(fields: [roomId], references: [id])
+
+  @@index([offeringId])
+  @@index([roomId, dayOfWeek])
+}
+
+/// A dated class session; attendance is recorded against it.
+model ClassMeeting {
+  id         String             @id @default(cuid())
+  offeringId String
+  slotId     String?
+  date       DateTime           @db.Date
+  startsAt   DateTime
+  endsAt     DateTime
+  roomId     String?
+  kind       SessionKind        @default(LECTURE)
+  topic      String?
+  status     MeetingStatus      @default(SCHEDULED)
+  takenById  String?
+  takenAt    DateTime?
+  createdAt  DateTime           @default(now())
+  offering   CourseOffering     @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  room       Room?              @relation(fields: [roomId], references: [id])
+  records    AttendanceRecord[]
+
+  @@unique([offeringId, startsAt])
+  @@index([date])
+}
+
+model AttendanceRecord {
+  id         String         @id @default(cuid())
+  meetingId  String
+  studentId  String
+  mark       AttendanceMark
+  remarks    String?
+  markedById String
+  markedAt   DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  meeting    ClassMeeting   @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  student    Student        @relation(fields: [studentId], references: [id])
+
+  @@unique([meetingId, studentId])
+  @@index([studentId])
+}
+
+model CoursePrerequisite {
+  courseId           String
+  prerequisiteId     String
+  minGradePoint      Float?
+  course             Course @relation("CoursePrerequisites", fields: [courseId], references: [id], onDelete: Cascade)
+  prerequisite       Course @relation("PrerequisiteOf", fields: [prerequisiteId], references: [id])
+
+  @@id([courseId, prerequisiteId])
+}
+
+/// Versioned programme structure. Batches pin a curriculum, so later revisions never change what
+/// an earlier cohort must complete.
+model Curriculum {
+  id           String             @id @default(cuid())
+  programId    String
+  regulationId String
+  version      Int
+  name         String
+  totalCredits Int
+  minCgpa      Float?
+  status       CurriculumStatus   @default(DRAFT)
+  /// Extra degree requirements evaluated by the degree-audit engine (see src/lib/domain/degree-audit.ts)
+  requirements Json?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  program      Program            @relation(fields: [programId], references: [id])
+  regulation   Regulation         @relation(fields: [regulationId], references: [id])
+  courses      CurriculumCourse[]
+  groups       ElectiveGroup[]
+  batches      Batch[]
+
+  @@unique([programId, regulationId, version])
+}
+
+model ElectiveGroup {
+  id           String             @id @default(cuid())
+  curriculumId String
+  code         String
+  name         String
+  minCredits   Int
+  curriculum   Curriculum         @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
+  courses      CurriculumCourse[]
+
+  @@unique([curriculumId, code])
+}
+
+model CurriculumCourse {
+  id             String             @id @default(cuid())
+  curriculumId   String
+  courseId       String
+  semesterNumber Int
+  category       CurriculumCategory @default(MANDATORY)
+  groupId        String?
+  curriculum     Curriculum         @relation(fields: [curriculumId], references: [id], onDelete: Cascade)
+  course         Course             @relation(fields: [courseId], references: [id])
+  group          ElectiveGroup?     @relation(fields: [groupId], references: [id])
+
+  @@unique([curriculumId, courseId])
+}

@@ -1,0 +1,253 @@
+// ───────────────────────── Research (projects, grants, publications) and IQAC / accreditation ─────────────────────────
+
+enum ProjectStatus {
+  DRAFT
+  UNDER_REVIEW
+  APPROVED // cleared by the institution for submission to the agency
+  SANCTIONED
+  COMPLETED
+  REJECTED
+  WITHDRAWN
+}
+
+enum ProjectRole {
+  PI
+  CO_PI
+  MEMBER
+}
+
+enum BudgetHead {
+  EQUIPMENT
+  CONSUMABLES
+  TRAVEL
+  MANPOWER
+  CONTINGENCY
+  OVERHEAD
+}
+
+enum PublicationType {
+  JOURNAL
+  CONFERENCE
+  BOOK
+  CHAPTER
+  PATENT
+}
+
+enum Indexing {
+  SCOPUS
+  WEB_OF_SCIENCE
+  UGC_CARE
+  PUBMED
+  OTHER
+  NONE
+}
+
+enum MetricKind {
+  QUANTITATIVE
+  QUALITATIVE
+}
+
+enum ResponseStatus {
+  NOT_STARTED
+  DRAFT
+  SUBMITTED
+  APPROVED
+  RETURNED
+}
+
+model ResearchProject {
+  id               String          @id @default(cuid())
+  code             String          @unique
+  title            String
+  abstract         String
+  departmentId     String?
+  fundingAgency    String
+  scheme           String?
+  proposedAmount   Decimal         @db.Decimal(14, 2)
+  sanctionedAmount Decimal?        @db.Decimal(14, 2)
+  grantRef         String?
+  startDate        DateTime?       @db.Date
+  endDate          DateTime?       @db.Date
+  durationMonths   Int
+  status           ProjectStatus   @default(DRAFT)
+  outcome          String?
+  createdById      String
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  department       Department?     @relation(fields: [departmentId], references: [id])
+  members          ProjectMember[]
+  budget           ProjectBudgetLine[]
+  expenses         ProjectExpense[]
+  publications     Publication[]
+
+  @@index([status])
+  @@index([departmentId])
+}
+
+model ProjectMember {
+  projectId  String
+  employeeId String
+  role       ProjectRole
+  project    ResearchProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  employee   Employee        @relation(fields: [employeeId], references: [id])
+
+  @@id([projectId, employeeId])
+  @@index([employeeId])
+}
+
+model ProjectBudgetLine {
+  id        String          @id @default(cuid())
+  projectId String
+  head      BudgetHead
+  amount    Decimal         @db.Decimal(14, 2)
+  project   ResearchProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, head])
+}
+
+/// Spending against a sanctioned grant. Append-only; corrections are negative entries with a reason.
+model ProjectExpense {
+  id          String          @id @default(cuid())
+  projectId   String
+  head        BudgetHead
+  amount      Decimal         @db.Decimal(14, 2)
+  date        DateTime        @db.Date
+  voucherNo   String?
+  description String
+  recordedById String
+  createdAt   DateTime        @default(now())
+  project     ResearchProject @relation(fields: [projectId], references: [id])
+
+  @@index([projectId, head])
+}
+
+model Publication {
+  id           String            @id @default(cuid())
+  type         PublicationType
+  title        String
+  venue        String // journal, conference, publisher or patent office
+  year         Int
+  volume       String?
+  pages        String?
+  doi          String?           @unique
+  isbn         String?
+  url          String?
+  authorsText  String // full author list as printed
+  indexing     Indexing          @default(NONE)
+  impactFactor Float?
+  departmentId String?
+  projectId    String?
+  verifiedAt   DateTime?
+  verifiedById String?
+  createdById  String
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  department   Department?       @relation(fields: [departmentId], references: [id])
+  project      ResearchProject?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  authors      PublicationAuthor[]
+
+  @@index([year])
+  @@index([departmentId, year])
+}
+
+/// Institutional authors of a publication (the full list is authorsText).
+model PublicationAuthor {
+  publicationId String
+  employeeId    String
+  position      Int
+  publication   Publication @relation(fields: [publicationId], references: [id], onDelete: Cascade)
+  employee      Employee    @relation(fields: [employeeId], references: [id])
+
+  @@id([publicationId, employeeId])
+  @@index([employeeId])
+}
+
+// ───────────────────────── IQAC / accreditation ─────────────────────────
+
+/// An accreditation or ranking framework (NAAC, NBA, NIRF…) and its criteria/metrics tree.
+model AccreditationFramework {
+  id          String                  @id @default(cuid())
+  code        String                  @unique
+  name        String
+  description String?
+  createdAt   DateTime                @default(now())
+  metrics     AccreditationMetric[]
+  cycles      AccreditationCycle[]
+}
+
+model AccreditationMetric {
+  id          String                 @id @default(cuid())
+  frameworkId String
+  parentId    String?
+  code        String // e.g. "3.3.1"
+  title       String
+  kind        MetricKind
+  /// Marks / weightage of the metric in the framework (for progress weighting)
+  weight      Float                  @default(0)
+  /// Guidance for the data owner
+  guidance    String?
+  /// Key of a computed value the platform can provide (see src/server/services/iqac-sources.ts)
+  source      String?
+  unit        String?
+  order       Int                    @default(0)
+  framework   AccreditationFramework @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
+  parent      AccreditationMetric?   @relation("MetricTree", fields: [parentId], references: [id])
+  children    AccreditationMetric[]  @relation("MetricTree")
+  responses   MetricResponse[]
+
+  @@unique([frameworkId, code])
+}
+
+model AccreditationCycle {
+  id             String                 @id @default(cuid())
+  frameworkId    String
+  name           String
+  academicYearId String
+  /// Data years covered, e.g. the last five academic years for NAAC
+  yearsCovered   Int                    @default(1)
+  dueDate        DateTime?              @db.Date
+  isClosed       Boolean                @default(false)
+  createdAt      DateTime               @default(now())
+  framework      AccreditationFramework @relation(fields: [frameworkId], references: [id])
+  academicYear   AcademicYear           @relation(fields: [academicYearId], references: [id])
+  responses      MetricResponse[]
+
+  @@unique([frameworkId, academicYearId])
+}
+
+/// A data owner's response to one metric in one cycle, reviewed by IQAC.
+model MetricResponse {
+  id           String              @id @default(cuid())
+  cycleId      String
+  metricId     String
+  assigneeId   String?
+  value        Float?
+  narrative    String?
+  /// Snapshot of the platform-computed value adopted, with its inputs, when the owner used it
+  computed     Json?
+  status       ResponseStatus      @default(NOT_STARTED)
+  reviewNote   String?
+  submittedAt  DateTime?
+  reviewedAt   DateTime?
+  reviewedById String?
+  updatedAt    DateTime            @updatedAt
+  cycle        AccreditationCycle  @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  metric       AccreditationMetric @relation(fields: [metricId], references: [id])
+  assignee     User?               @relation("MetricAssignee", fields: [assigneeId], references: [id])
+  evidence     MetricEvidence[]
+
+  @@unique([cycleId, metricId])
+  @@index([assigneeId, status])
+}
+
+model MetricEvidence {
+  id          String         @id @default(cuid())
+  responseId  String
+  fileId      String?
+  url         String?
+  label       String
+  addedById   String
+  createdAt   DateTime       @default(now())
+  response    MetricResponse @relation(fields: [responseId], references: [id], onDelete: Cascade)
+  file        FileAsset?     @relation(fields: [fileId], references: [id])
+}

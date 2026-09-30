@@ -1,0 +1,346 @@
+// ───────────────────────── Finance: fees, payments, concessions, scholarships, ledger ─────────────────────────
+// Money is stored as DECIMAL(14,2) in the institution currency. Business rules work in minor units
+// (paise/cents) as integers — see src/lib/domain/money.ts.
+
+enum FeeCategory {
+  TUITION
+  ADMISSION
+  EXAMINATION
+  REVALUATION
+  HOSTEL
+  TRANSPORT
+  LIBRARY
+  FINE
+  CERTIFICATE
+  MISCELLANEOUS
+}
+
+enum StructureStatus {
+  DRAFT
+  ACTIVE
+  RETIRED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  ISSUED
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+}
+
+enum PaymentMethod {
+  CASH
+  CHEQUE
+  DEMAND_DRAFT
+  BANK_TRANSFER
+  CARD_POS
+  ONLINE
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REVERSED
+}
+
+enum ConcessionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum RefundStatus {
+  REQUESTED
+  APPROVED
+  PAID
+  REJECTED
+}
+
+enum ScholarshipStatus {
+  DRAFT
+  OPEN
+  CLOSED
+}
+
+enum ApplicationStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  WITHDRAWN
+  DISBURSED
+}
+
+enum AccountType {
+  ASSET
+  LIABILITY
+  EQUITY
+  INCOME
+  EXPENSE
+}
+
+model FeeHead {
+  id              String          @id @default(cuid())
+  code            String          @unique
+  name            String
+  category        FeeCategory
+  incomeAccountId String?
+  isRefundable    Boolean         @default(false)
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  incomeAccount   LedgerAccount?  @relation(fields: [incomeAccountId], references: [id])
+  structureLines  FeeStructureLine[]
+  invoiceLines    InvoiceLine[]
+  concessions     Concession[]
+}
+
+/// Versioned fee structure for an academic year, optionally for one programme and/or batch.
+/// Invoices record the structure version they were raised from.
+model FeeStructure {
+  id             String             @id @default(cuid())
+  code           String
+  version        Int
+  name           String
+  academicYearId String
+  programId      String?
+  batchId        String?
+  status         StructureStatus    @default(DRAFT)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  academicYear   AcademicYear       @relation(fields: [academicYearId], references: [id])
+  program        Program?           @relation(fields: [programId], references: [id])
+  batch          Batch?             @relation(fields: [batchId], references: [id])
+  lines          FeeStructureLine[]
+  invoices       Invoice[]
+
+  @@unique([code, version])
+}
+
+model FeeStructureLine {
+  id          String       @id @default(cuid())
+  structureId String
+  feeHeadId   String
+  amount      Decimal      @db.Decimal(14, 2)
+  /// Semester the line applies to (null = every semester / once a year, per `termType`)
+  semester    Int?
+  termType    TermType?
+  dueDays     Int          @default(30) // days after issue
+  structure   FeeStructure @relation(fields: [structureId], references: [id], onDelete: Cascade)
+  feeHead     FeeHead      @relation(fields: [feeHeadId], references: [id])
+
+  @@index([structureId])
+}
+
+model Invoice {
+  id           String        @id @default(cuid())
+  number       String        @unique
+  studentId    String
+  termId       String?
+  structureId  String?
+  status       InvoiceStatus @default(ISSUED)
+  issueDate    DateTime      @default(now())
+  dueDate      DateTime      @db.Date
+  currency     String
+  subtotal     Decimal       @db.Decimal(14, 2)
+  concession   Decimal       @default(0) @db.Decimal(14, 2)
+  total        Decimal       @db.Decimal(14, 2)
+  amountPaid   Decimal       @default(0) @db.Decimal(14, 2)
+  /// What raised the invoice when it is not a fee structure: examSession, revaluationRequest, hostelAllocation…
+  sourceType   String?
+  sourceId     String?
+  notes        String?
+  cancelledAt  DateTime?
+  cancelReason String?
+  createdById  String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  student      Student       @relation(fields: [studentId], references: [id])
+  term         AcademicTerm? @relation(fields: [termId], references: [id])
+  structure    FeeStructure? @relation(fields: [structureId], references: [id])
+  lines        InvoiceLine[]
+  allocations  PaymentAllocation[]
+  concessions  Concession[]
+
+  @@index([studentId, status])
+  @@index([status, dueDate])
+  @@index([sourceType, sourceId])
+}
+
+model InvoiceLine {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  feeHeadId   String
+  description String
+  amount      Decimal  @db.Decimal(14, 2)
+  concession  Decimal  @default(0) @db.Decimal(14, 2)
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  feeHead     FeeHead  @relation(fields: [feeHeadId], references: [id])
+
+  @@index([invoiceId])
+}
+
+/// Money received. Immutable except for the status lifecycle (PENDING → SUCCEEDED/FAILED, SUCCEEDED → REVERSED).
+model Payment {
+  id               String              @id @default(cuid())
+  receiptNo        String?             @unique // assigned when the payment succeeds
+  studentId        String
+  amount           Decimal             @db.Decimal(14, 2)
+  currency         String
+  method           PaymentMethod
+  status           PaymentStatus
+  reference        String? // cheque / DD / UTR number
+  idempotencyKey   String              @unique
+  gatewayProvider  String?
+  gatewayOrderId   String?             @unique
+  gatewayPaymentId String?             @unique
+  gatewayPayload   Json?
+  receivedById     String?
+  receivedAt       DateTime            @default(now())
+  confirmedAt      DateTime?
+  reversedAt       DateTime?
+  reversalReason   String?
+  createdAt        DateTime            @default(now())
+  student          Student             @relation(fields: [studentId], references: [id])
+  allocations      PaymentAllocation[]
+  refunds          Refund[]
+
+  @@index([studentId, status])
+  @@index([status, receivedAt])
+}
+
+model PaymentAllocation {
+  id        String   @id @default(cuid())
+  paymentId String
+  invoiceId String
+  amount    Decimal  @db.Decimal(14, 2)
+  payment   Payment  @relation(fields: [paymentId], references: [id])
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id])
+
+  @@unique([paymentId, invoiceId])
+  @@index([invoiceId])
+}
+
+/// A waiver, concession or scholarship credit against an invoice, approved through the workflow engine.
+model Concession {
+  id           String           @id @default(cuid())
+  studentId    String
+  invoiceId    String
+  feeHeadId    String?
+  amount       Decimal          @db.Decimal(14, 2)
+  kind         String // WAIVER, CONCESSION, SCHOLARSHIP
+  reason       String
+  status       ConcessionStatus @default(PENDING)
+  scholarshipApplicationId String?
+  requestedById String
+  decidedAt    DateTime?
+  createdAt    DateTime         @default(now())
+  student      Student          @relation(fields: [studentId], references: [id])
+  invoice      Invoice          @relation(fields: [invoiceId], references: [id])
+  feeHead      FeeHead?         @relation(fields: [feeHeadId], references: [id])
+
+  @@index([invoiceId, status])
+}
+
+model Refund {
+  id          String       @id @default(cuid())
+  paymentId   String
+  amount      Decimal      @db.Decimal(14, 2)
+  reason      String
+  status      RefundStatus @default(REQUESTED)
+  reference   String?
+  requestedById String
+  paidAt      DateTime?
+  createdAt   DateTime     @default(now())
+  payment     Payment      @relation(fields: [paymentId], references: [id])
+
+  @@index([status])
+}
+
+model ScholarshipScheme {
+  id           String            @id @default(cuid())
+  code         String            @unique
+  name         String
+  sponsor      String?
+  description  String?
+  /// Fixed award in currency, or a percentage of the tuition due (one of the two)
+  amount       Decimal?          @db.Decimal(14, 2)
+  percent      Float?
+  /// Eligibility rules, validated by src/lib/domain/scholarship.ts
+  criteria     Json
+  seats        Int?
+  opensAt      DateTime?
+  closesAt     DateTime?
+  status       ScholarshipStatus @default(DRAFT)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  applications ScholarshipApplication[]
+}
+
+model ScholarshipApplication {
+  id             String            @id @default(cuid())
+  schemeId       String
+  studentId      String
+  academicYearId String
+  statement      String
+  declaredIncome Decimal?          @db.Decimal(14, 2)
+  eligibility    Json? // rule check snapshot at submission
+  status         ApplicationStatus @default(SUBMITTED)
+  awardAmount    Decimal?          @db.Decimal(14, 2)
+  decidedAt      DateTime?
+  createdAt      DateTime          @default(now())
+  scheme         ScholarshipScheme @relation(fields: [schemeId], references: [id])
+  student        Student           @relation(fields: [studentId], references: [id])
+  academicYear   AcademicYear      @relation(fields: [academicYearId], references: [id])
+
+  @@unique([schemeId, studentId, academicYearId])
+  @@index([status])
+}
+
+model LedgerAccount {
+  id        String        @id @default(cuid())
+  code      String        @unique
+  name      String
+  type      AccountType
+  parentId  String?
+  isActive  Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  parent    LedgerAccount?  @relation("AccountTree", fields: [parentId], references: [id])
+  children  LedgerAccount[] @relation("AccountTree")
+  lines     JournalLine[]
+  feeHeads  FeeHead[]
+  salaryComponents SalaryComponent[]
+}
+
+/// Double-entry journal. Entries are append-only; corrections are reversing entries.
+model JournalEntry {
+  id          String        @id @default(cuid())
+  number      String        @unique
+  date        DateTime      @db.Date
+  memo        String
+  sourceType  String?
+  sourceId    String?
+  postedById  String?
+  reversesId  String?       @unique
+  createdAt   DateTime      @default(now())
+  lines       JournalLine[]
+
+  @@index([sourceType, sourceId])
+  @@index([date])
+}
+
+model JournalLine {
+  id        String        @id @default(cuid())
+  entryId   String
+  accountId String
+  debit     Decimal       @default(0) @db.Decimal(14, 2)
+  credit    Decimal       @default(0) @db.Decimal(14, 2)
+  studentId String? // sub-ledger for receivables
+  entry     JournalEntry  @relation(fields: [entryId], references: [id])
+  account   LedgerAccount @relation(fields: [accountId], references: [id])
+
+  @@index([accountId])
+  @@index([studentId])
+}

@@ -1,0 +1,436 @@
+// ───────────────────────── Campus services: library, hostel, transport, helpdesk, announcements, documents,
+//                            admissions, placements, alumni ─────────────────────────
+
+// ── Library ──
+
+enum CopyStatus {
+  AVAILABLE
+  ON_LOAN
+  LOST
+  WITHDRAWN
+}
+
+model LibraryItem {
+  id        String        @id @default(cuid())
+  title     String
+  authors   String
+  isbn      String?
+  publisher String?
+  year      Int?
+  edition   String?
+  subject   String?
+  callNo    String?
+  createdAt DateTime      @default(now())
+  copies    LibraryCopy[]
+  holds     LibraryHold[]
+
+  @@index([title])
+  @@index([isbn])
+}
+
+model LibraryCopy {
+  id          String       @id @default(cuid())
+  itemId      String
+  accessionNo String       @unique
+  location    String?
+  status      CopyStatus   @default(AVAILABLE)
+  createdAt   DateTime     @default(now())
+  item        LibraryItem  @relation(fields: [itemId], references: [id])
+  loans       LibraryLoan[]
+
+  @@index([itemId, status])
+}
+
+/// A borrower is a student or an employee (exactly one).
+model LibraryLoan {
+  id           String      @id @default(cuid())
+  copyId       String
+  studentId    String?
+  employeeId   String?
+  issuedAt     DateTime    @default(now())
+  dueAt        DateTime
+  renewals     Int         @default(0)
+  returnedAt   DateTime?
+  fineAmount   Decimal     @default(0) @db.Decimal(14, 2)
+  fineInvoiceId String?
+  issuedById   String
+  returnedToId String?
+  copy         LibraryCopy @relation(fields: [copyId], references: [id])
+  student      Student?    @relation(fields: [studentId], references: [id])
+  employee     Employee?   @relation(fields: [employeeId], references: [id])
+
+  @@index([studentId, returnedAt])
+  @@index([employeeId, returnedAt])
+  @@index([copyId, returnedAt])
+}
+
+model LibraryHold {
+  id         String      @id @default(cuid())
+  itemId     String
+  studentId  String?
+  employeeId String?
+  createdAt  DateTime    @default(now())
+  fulfilledAt DateTime?
+  cancelledAt DateTime?
+  item       LibraryItem @relation(fields: [itemId], references: [id])
+  student    Student?    @relation(fields: [studentId], references: [id])
+  employee   Employee?   @relation(fields: [employeeId], references: [id])
+
+  @@index([itemId, fulfilledAt, cancelledAt])
+}
+
+// ── Hostel ──
+
+model Hostel {
+  id          String       @id @default(cuid())
+  code        String       @unique
+  name        String
+  campusId    String?
+  gender      Gender?
+  wardenId    String?
+  feePerTerm  Decimal      @default(0) @db.Decimal(14, 2)
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  campus      Campus?      @relation(fields: [campusId], references: [id])
+  warden      User?        @relation("HostelWarden", fields: [wardenId], references: [id])
+  rooms       HostelRoom[]
+}
+
+model HostelRoom {
+  id          String             @id @default(cuid())
+  hostelId    String
+  number      String
+  floor       Int                @default(0)
+  capacity    Int
+  isActive    Boolean            @default(true)
+  hostel      Hostel             @relation(fields: [hostelId], references: [id], onDelete: Cascade)
+  allocations HostelAllocation[]
+
+  @@unique([hostelId, number])
+}
+
+model HostelAllocation {
+  id          String     @id @default(cuid())
+  roomId      String
+  studentId   String
+  fromDate    DateTime   @db.Date
+  vacatedAt   DateTime?  @db.Date
+  vacateReason String?
+  invoiceId   String?
+  allocatedById String
+  createdAt   DateTime   @default(now())
+  room        HostelRoom @relation(fields: [roomId], references: [id])
+  student     Student    @relation(fields: [studentId], references: [id])
+
+  @@index([roomId, vacatedAt])
+  @@index([studentId, vacatedAt])
+}
+
+// ── Transport ──
+
+model TransportRoute {
+  id         String          @id @default(cuid())
+  code       String          @unique
+  name       String
+  vehicle    String?
+  driver     String?
+  capacity   Int
+  /// [{ name, time }] in boarding order
+  stops      Json
+  feePerTerm Decimal         @default(0) @db.Decimal(14, 2)
+  isActive   Boolean         @default(true)
+  createdAt  DateTime        @default(now())
+  passes     TransportPass[]
+}
+
+model TransportPass {
+  id          String         @id @default(cuid())
+  routeId     String
+  studentId   String
+  stop        String
+  validFrom   DateTime       @db.Date
+  validTo     DateTime       @db.Date
+  cancelledAt DateTime?
+  invoiceId   String?
+  issuedById  String
+  createdAt   DateTime       @default(now())
+  route       TransportRoute @relation(fields: [routeId], references: [id])
+  student     Student        @relation(fields: [studentId], references: [id])
+
+  @@index([routeId, cancelledAt])
+  @@index([studentId])
+}
+
+// ── Helpdesk ──
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  WAITING
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model Ticket {
+  id          String          @id @default(cuid())
+  number      String          @unique
+  requesterId String
+  category    String
+  subject     String
+  priority    TicketPriority  @default(NORMAL)
+  status      TicketStatus    @default(OPEN)
+  assigneeId  String?
+  dueAt       DateTime
+  firstResponseAt DateTime?
+  resolvedAt  DateTime?
+  closedAt    DateTime?
+  satisfaction Int?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  requester   User            @relation("TicketRequester", fields: [requesterId], references: [id])
+  assignee    User?           @relation("TicketAssignee", fields: [assigneeId], references: [id])
+  messages    TicketMessage[]
+
+  @@index([status, category])
+  @@index([status, dueAt])
+  @@index([requesterId])
+  @@index([assigneeId, status])
+}
+
+model TicketMessage {
+  id        String   @id @default(cuid())
+  ticketId  String
+  authorId  String
+  body      String
+  /// Internal notes are visible to agents only
+  internal  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  ticket    Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author    User     @relation("TicketMessageAuthor", fields: [authorId], references: [id])
+
+  @@index([ticketId, createdAt])
+}
+
+// ── Institution announcements ──
+
+enum AnnouncementAudience {
+  EVERYONE
+  STAFF
+  STUDENTS
+  GUARDIANS
+}
+
+model Announcement {
+  id           String               @id @default(cuid())
+  title        String
+  body         String
+  audience     AnnouncementAudience
+  /// Optional narrowing for student/guardian audiences
+  departmentId String?
+  programId    String?
+  pinned       Boolean              @default(false)
+  publishAt    DateTime
+  expiresAt    DateTime?
+  notified     Boolean              @default(false)
+  authorId     String
+  createdAt    DateTime             @default(now())
+  author       User                 @relation("AnnouncementAuthor", fields: [authorId], references: [id])
+  department   Department?          @relation(fields: [departmentId], references: [id])
+  program      Program?             @relation(fields: [programId], references: [id])
+
+  @@index([publishAt, expiresAt])
+}
+
+// ── Student documents ──
+
+enum DocumentStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+model StudentDocument {
+  id           String         @id @default(cuid())
+  studentId    String
+  type         String // e.g. MARKSHEET_12, TRANSFER_CERTIFICATE, ID_PROOF, CATEGORY_CERTIFICATE
+  fileId       String
+  status       DocumentStatus @default(PENDING)
+  note         String?
+  uploadedById String
+  verifiedById String?
+  verifiedAt   DateTime?
+  createdAt    DateTime       @default(now())
+  student      Student        @relation(fields: [studentId], references: [id])
+  file         FileAsset      @relation(fields: [fileId], references: [id])
+
+  @@index([studentId, type])
+}
+
+// ── Admissions ──
+
+enum ApplicantStatus {
+  SUBMITTED
+  VERIFIED
+  REJECTED
+  OFFERED
+  ACCEPTED
+  DECLINED
+  ENROLLED
+  WITHDRAWN
+}
+
+model AdmissionCycle {
+  id             String            @id @default(cuid())
+  name           String
+  academicYearId String
+  opensAt        DateTime
+  closesAt       DateTime
+  isPublic       Boolean           @default(false)
+  createdAt      DateTime          @default(now())
+  academicYear   AcademicYear      @relation(fields: [academicYearId], references: [id])
+  seats          AdmissionSeat[]
+  applications   AdmissionApplication[]
+}
+
+/// Seats per programme in a cycle, with the batch admitted students join.
+model AdmissionSeat {
+  id       String         @id @default(cuid())
+  cycleId  String
+  programId String
+  batchId  String
+  seats    Int
+  /// Offers expire after this many days without acceptance
+  offerValidDays Int      @default(7)
+  cycle    AdmissionCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  program  Program        @relation(fields: [programId], references: [id])
+  batch    Batch          @relation(fields: [batchId], references: [id])
+
+  @@unique([cycleId, programId])
+}
+
+model AdmissionApplication {
+  id            String          @id @default(cuid())
+  number        String          @unique
+  cycleId       String
+  programId     String
+  firstName     String
+  lastName      String
+  email         String
+  phone         String
+  dateOfBirth   DateTime        @db.Date
+  gender        Gender?
+  category      String?
+  /// Qualifying examination
+  qualifyingExam String
+  qualifyingPercent Float
+  entranceScore Float?
+  /// Merit score used for ranking (computed when verified)
+  meritScore    Float?
+  status        ApplicantStatus @default(SUBMITTED)
+  remarks       String?
+  offerExpiresAt DateTime?
+  studentId     String?         @unique
+  /// Secret token for the applicant's status page (hashed)
+  accessTokenHash String        @unique
+  submittedIp   String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  cycle         AdmissionCycle  @relation(fields: [cycleId], references: [id])
+  program       Program         @relation(fields: [programId], references: [id])
+  student       Student?        @relation(fields: [studentId], references: [id])
+
+  @@index([cycleId, programId, status])
+  @@index([email])
+}
+
+// ── Placements ──
+
+enum DriveStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  COMPLETED
+}
+
+enum PlacementStatus {
+  APPLIED
+  SHORTLISTED
+  SELECTED
+  REJECTED
+  WITHDRAWN
+}
+
+model Company {
+  id        String           @id @default(cuid())
+  name      String           @unique
+  industry  String?
+  website   String?
+  contactName  String?
+  contactEmail String?
+  createdAt DateTime         @default(now())
+  drives    PlacementDrive[]
+}
+
+model PlacementDrive {
+  id          String                 @id @default(cuid())
+  companyId   String
+  title       String
+  role        String
+  description String
+  location    String?
+  ctc         Decimal                @db.Decimal(14, 2) // annual, in currency units
+  /// { minCgpa?, programCodes?[], maxActiveBacklogs?, batchYears?[] }
+  eligibility Json
+  applyBy     DateTime
+  driveDate   DateTime?
+  status      DriveStatus            @default(DRAFT)
+  createdById String
+  createdAt   DateTime               @default(now())
+  company     Company                @relation(fields: [companyId], references: [id])
+  applications PlacementApplication[]
+
+  @@index([status, applyBy])
+}
+
+model PlacementApplication {
+  id         String          @id @default(cuid())
+  driveId    String
+  studentId  String
+  status     PlacementStatus @default(APPLIED)
+  /// Eligibility facts at the time of applying
+  snapshot   Json
+  offerCtc   Decimal?        @db.Decimal(14, 2)
+  updatedById String?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  drive      PlacementDrive  @relation(fields: [driveId], references: [id])
+  student    Student         @relation(fields: [studentId], references: [id])
+
+  @@unique([driveId, studentId])
+  @@index([studentId, status])
+}
+
+// ── Alumni ──
+
+model AlumniProfile {
+  id            String   @id @default(cuid())
+  studentId     String   @unique
+  email         String
+  phone         String?
+  employer      String?
+  designation   String?
+  city          String?
+  higherStudies String?
+  linkedin      String?
+  /// Listed in the alumni directory only with consent
+  inDirectory   Boolean  @default(false)
+  updatedAt     DateTime @updatedAt
+  student       Student  @relation(fields: [studentId], references: [id])
+}

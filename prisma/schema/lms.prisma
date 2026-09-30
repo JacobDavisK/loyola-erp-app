@@ -1,0 +1,229 @@
+// ───────────────────────── Learning management: course content, announcements, assignments, quizzes ─────────────────────────
+// Every course space belongs to a CourseOffering (a section of a course in a term). Instructors are the
+// offering's OfferingInstructor rows; learners are its registered students.
+
+enum LearningItemKind {
+  PAGE
+  FILE
+  LINK
+  VIDEO
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  GRADED
+  RETURNED
+}
+
+enum QuizQuestionType {
+  SINGLE
+  MULTIPLE
+  TRUE_FALSE
+  SHORT
+  NUMERIC
+}
+
+enum QuizReviewPolicy {
+  AFTER_SUBMIT
+  AFTER_CLOSE
+  SCORE_ONLY
+  NEVER
+}
+
+enum QuizAttemptStatus {
+  IN_PROGRESS
+  SUBMITTED
+}
+
+model CourseModule {
+  id          String         @id @default(cuid())
+  offeringId  String
+  title       String
+  description String?
+  order       Int            @default(0)
+  isPublished Boolean        @default(false)
+  createdAt   DateTime       @default(now())
+  offering    CourseOffering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  items       LearningItem[]
+  assignments Assignment[]
+  quizzes     Quiz[]
+
+  @@index([offeringId, order])
+}
+
+model LearningItem {
+  id            String           @id @default(cuid())
+  moduleId      String
+  kind          LearningItemKind
+  title         String
+  /// Plain text / markdown-lite body for pages, or a description for files and links
+  body          String?
+  url           String?
+  fileId        String?
+  order         Int              @default(0)
+  isPublished   Boolean          @default(false)
+  availableFrom DateTime?
+  createdById   String
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  module        CourseModule     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  file          FileAsset?       @relation(fields: [fileId], references: [id])
+  views         LearningItemView[]
+
+  @@index([moduleId, order])
+}
+
+/// Completion tracking: first and last time a student opened an item.
+model LearningItemView {
+  itemId        String
+  studentId     String
+  firstViewedAt DateTime     @default(now())
+  lastViewedAt  DateTime     @default(now())
+  views         Int          @default(1)
+  item          LearningItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  student       Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, studentId])
+}
+
+model CourseAnnouncement {
+  id         String         @id @default(cuid())
+  offeringId String
+  title      String
+  body       String
+  authorId   String
+  createdAt  DateTime       @default(now())
+  offering   CourseOffering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  author     User           @relation("CourseAnnouncementAuthor", fields: [authorId], references: [id])
+
+  @@index([offeringId, createdAt])
+}
+
+model Assignment {
+  id                 String       @id @default(cuid())
+  offeringId         String
+  moduleId           String?
+  title              String
+  instructions       String
+  maxMarks           Float
+  dueAt              DateTime
+  /// Late submissions are accepted until this time (null = none after the due time)
+  closesAt           DateTime?
+  latePenaltyPercent Float        @default(0)
+  maxAttempts        Int          @default(1)
+  allowText          Boolean      @default(true)
+  allowFiles         Boolean      @default(true)
+  maxFiles           Int          @default(3)
+  isPublished        Boolean      @default(false)
+  publishedAt        DateTime?
+  /// Students see marks and feedback only after release
+  gradesReleasedAt   DateTime?
+  createdById        String
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+  offering           CourseOffering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  module             CourseModule?  @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+  submissions        Submission[]
+
+  @@index([offeringId, dueAt])
+}
+
+model Submission {
+  id           String           @id @default(cuid())
+  assignmentId String
+  studentId    String
+  attempt      Int
+  text         String?
+  submittedAt  DateTime         @default(now())
+  isLate       Boolean          @default(false)
+  status       SubmissionStatus @default(SUBMITTED)
+  /// Marks awarded before the late penalty
+  marks        Float?
+  /// Fraction deducted for lateness (0–1), fixed at submission time
+  penalty      Float            @default(0)
+  finalMarks   Float?
+  feedback     String?
+  gradedById   String?
+  gradedAt     DateTime?
+  assignment   Assignment       @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student      Student          @relation(fields: [studentId], references: [id])
+  files        SubmissionFile[]
+
+  @@unique([assignmentId, studentId, attempt])
+  @@index([assignmentId, status])
+  @@index([studentId])
+}
+
+model SubmissionFile {
+  submissionId String
+  fileId       String
+  submission   Submission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  file         FileAsset  @relation(fields: [fileId], references: [id])
+
+  @@id([submissionId, fileId])
+}
+
+model Quiz {
+  id               String           @id @default(cuid())
+  offeringId       String
+  moduleId         String?
+  title            String
+  instructions     String?
+  opensAt          DateTime
+  closesAt         DateTime
+  timeLimitMinutes Int?
+  maxAttempts      Int              @default(1)
+  shuffleQuestions Boolean          @default(false)
+  reviewPolicy     QuizReviewPolicy @default(AFTER_CLOSE)
+  isPublished      Boolean          @default(false)
+  createdById      String
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  offering         CourseOffering   @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  module           CourseModule?    @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+  questions        QuizQuestion[]
+  attempts         QuizAttempt[]
+
+  @@index([offeringId, opensAt])
+}
+
+model QuizQuestion {
+  id          String           @id @default(cuid())
+  quizId      String
+  order       Int              @default(0)
+  type        QuizQuestionType
+  prompt      String
+  /// [{ id, text }] for SINGLE / MULTIPLE
+  options     Json?
+  /// Server-only key: option ids, a boolean, accepted strings, or { value, tolerance }
+  answer      Json
+  marks       Float
+  explanation String?
+  quiz        Quiz             @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([quizId, order])
+}
+
+model QuizAttempt {
+  id            String            @id @default(cuid())
+  quizId        String
+  studentId     String
+  attemptNo     Int
+  startedAt     DateTime          @default(now())
+  /// Earlier of start + time limit and the quiz closing time
+  deadlineAt    DateTime
+  submittedAt   DateTime?
+  status        QuizAttemptStatus @default(IN_PROGRESS)
+  questionOrder Json // question ids in the order shown to this student
+  answers       Json              @default("{}")
+  /// Per-question marks awarded { questionId: marks }
+  marksAwarded  Json?
+  score         Float?
+  maxScore      Float
+  quiz          Quiz              @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  student       Student           @relation(fields: [studentId], references: [id])
+
+  @@unique([quizId, studentId, attemptNo])
+  @@index([quizId, status])
+  @@index([studentId, status])
+}

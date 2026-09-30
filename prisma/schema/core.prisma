@@ -1,0 +1,1206 @@
+// EXAMCORE — University Examination & Question Paper Management System
+// PostgreSQL schema. Conventions:
+//  * cuid string ids, createdAt/updatedAt on mutable records
+//  * soft deletion (deletedAt) for records referenced by history (users, questions, papers, courses)
+//  * immutable history tables (QuestionVersion, QuestionPaperVersion, QuestionUsage, AuditLog) are never updated
+//  * optimistic concurrency through `revision` on editable aggregates
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────────── Enums ─────────────────────────────
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  INVITED
+}
+
+/// What kind of person the account belongs to. Drives the default portal, not permissions.
+enum UserType {
+  STAFF
+  STUDENT
+  GUARDIAN
+  EXTERNAL
+}
+
+enum AcademicUnitType {
+  FACULTY
+  SCHOOL
+  CENTRE
+  DIVISION
+}
+
+enum TermType {
+  ODD
+  EVEN
+}
+
+enum ProgramLevel {
+  UG
+  PG
+  DIPLOMA
+  DOCTORAL
+}
+
+enum CourseType {
+  CORE
+  ELECTIVE
+  ALLIED
+  SKILL_ENHANCEMENT
+  ABILITY_ENHANCEMENT
+  PROJECT
+}
+
+enum CourseMode {
+  THEORY
+  PRACTICAL
+  THEORY_PRACTICAL
+}
+
+enum ExamType {
+  REGULAR
+  SUPPLEMENTARY
+  REVALUATION
+  IMPROVEMENT
+  BACKLOG
+  SPECIAL
+}
+
+enum SessionStatus {
+  PLANNING
+  OPEN
+  PAPER_SETTING
+  MODERATION
+  SCRUTINY
+  APPROVAL
+  LOCKED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ExamSlot {
+  FN
+  AN
+}
+
+enum QuestionType {
+  MCQ
+  TRUE_FALSE
+  FILL_BLANK
+  VERY_SHORT
+  SHORT
+  DESCRIPTIVE
+  ESSAY
+  CASE_STUDY
+  PROBLEM
+  NUMERICAL
+  ASSERTION_REASON
+  MATCH
+}
+
+enum Difficulty {
+  EASY
+  MODERATE
+  HARD
+}
+
+enum BloomLevel {
+  REMEMBER
+  UNDERSTAND
+  APPLY
+  ANALYZE
+  EVALUATE
+  CREATE
+}
+
+enum QuestionStatus {
+  DRAFT
+  PENDING_REVIEW
+  ACTIVE
+  RETIRED
+}
+
+enum BlueprintDimension {
+  DIFFICULTY
+  BLOOM
+  UNIT
+  OUTCOME
+  QUESTION_TYPE
+}
+
+enum PaperStatus {
+  DRAFT
+  SUBMITTED
+  UNDER_MODERATION
+  REVISION_REQUIRED
+  RESUBMITTED
+  UNDER_SCRUTINY
+  AWAITING_APPROVAL
+  APPROVED
+  LOCKED
+  RELEASED
+  ARCHIVED
+  REJECTED
+}
+
+enum AssignmentStatus {
+  ASSIGNED
+  ACCEPTED
+  DECLINED
+  IN_PROGRESS
+  SUBMITTED
+  RETURNED
+  RESUBMITTED
+  APPROVED
+  CANCELLED
+}
+
+enum ModerationStatus {
+  PENDING
+  IN_REVIEW
+  CHANGES_REQUESTED
+  APPROVED
+  REJECTED
+}
+
+enum ModerationCommentKind {
+  COMMENT
+  ISSUE
+  SUGGEST_REPLACEMENT
+  REPLACED
+}
+
+enum ScrutinyStatus {
+  PENDING
+  IN_PROGRESS
+  PASSED
+  RETURNED
+}
+
+enum ApprovalDecision {
+  APPROVED
+  RETURNED
+  REJECTED
+}
+
+enum FileKind {
+  QUESTION_IMAGE
+  STUDENT_DOCUMENT
+  EVIDENCE
+  COURSE_MATERIAL
+  SUBMISSION
+  LOGO
+  AVATAR
+  EXPORT
+  PACKAGE
+  OTHER
+}
+
+enum TemplateKind {
+  PAPER
+  INSTRUCTIONS
+  HEADER
+  FOOTER
+}
+
+// ───────────────────────── Identity & RBAC ─────────────────────────
+
+model User {
+  id                String     @id @default(cuid())
+  email             String     @unique
+  employeeId        String     @unique
+  name              String
+  designation       String?
+  phone             String?
+  passwordHash      String
+  status            UserStatus @default(ACTIVE)
+  userType          UserType   @default(STAFF)
+  departmentId      String?
+  avatarAssetId     String?
+  failedLoginCount  Int        @default(0)
+  lockedUntil       DateTime?
+  lastLoginAt       DateTime?
+  passwordChangedAt DateTime   @default(now())
+  mustChangePassword Boolean   @default(false)
+  mfaEnabled        Boolean    @default(false)
+  mfaSecretEnc      String? // AES-256-GCM encrypted TOTP secret
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  deletedAt         DateTime?
+
+  department            Department?          @relation("DepartmentMembers", fields: [departmentId], references: [id])
+  roles                 UserRole[]
+  sessions              Session[]
+  resetTokens           PasswordResetToken[]
+  notifications         Notification[]
+  savedFilters          SavedFilter[]
+  authoredQuestions     Question[]           @relation("QuestionAuthor")
+  questionVersions      QuestionVersion[]
+  setterAssignments     SetterAssignment[]   @relation("AssignmentSetter")
+  backupAssignments     SetterAssignment[]   @relation("AssignmentBackupSetter")
+  createdAssignments    SetterAssignment[]   @relation("AssignmentCreator")
+  papersOwned           QuestionPaper[]      @relation("PaperSetter")
+  paperVersions         QuestionPaperVersion[]
+  moderations           Moderation[]         @relation("Moderator")
+  moderationComments    ModerationComment[]
+  scrutinies            Scrutiny[]           @relation("ScrutinyOfficer")
+  approvals             Approval[]
+  moderatorFor          Examination[]        @relation("ExamModerator")
+  scrutinizerFor        Examination[]        @relation("ExamScrutinizer")
+  recommendations       SetterRecommendation[] @relation("RecommendedSetter")
+  recommendationsMade   SetterRecommendation[] @relation("Recommender")
+  files                 FileAsset[]
+  transitions           PaperTransition[]
+  workflowsStarted      WorkflowInstance[]   @relation("WorkflowInitiator")
+  workflowTasks         WorkflowTask[]       @relation("WorkflowAssignee")
+  delegatedTasks        WorkflowTask[]       @relation("WorkflowDelegatedFrom")
+  workflowActions       WorkflowAction[]
+  delegationsGiven      WorkflowDelegation[] @relation("DelegationFrom")
+  delegationsReceived   WorkflowDelegation[] @relation("DelegationTo")
+  jobs                  Job[]
+  studentProfile        Student?             @relation("StudentAccount")
+  guardianOf            Guardian[]           @relation("GuardianAccount")
+  teaching              OfferingInstructor[] @relation("Teaching")
+  invigilations         InvigilationDuty[]   @relation("Invigilator")
+  employeeProfile       Employee?            @relation("EmployeeAccount")
+  valuations            ScriptValuation[]    @relation("Valuer")
+  courseAnnouncements   CourseAnnouncement[] @relation("CourseAnnouncementAuthor")
+  metricResponses       MetricResponse[]     @relation("MetricAssignee")
+  hostelsWarden         Hostel[]             @relation("HostelWarden")
+  ticketsRaised         Ticket[]             @relation("TicketRequester")
+  ticketsAssigned       Ticket[]             @relation("TicketAssignee")
+  ticketMessages        TicketMessage[]      @relation("TicketMessageAuthor")
+  announcementsAuthored Announcement[]       @relation("AnnouncementAuthor")
+  savedReports          SavedReport[]        @relation("SavedReportOwner")
+  aiRequests            AiRequest[]          @relation("AiRequestUser")
+
+  @@index([departmentId])
+  @@index([userType])
+  @@index([status])
+  @@index([name(ops: raw("gin_trgm_ops"))], type: Gin, map: "User_name_trgm_idx")
+}
+
+model Role {
+  id          String           @id @default(cuid())
+  key         String           @unique
+  name        String
+  description String?
+  isSystem    Boolean          @default(false)
+  isGlobal    Boolean          @default(false) // global roles see all departments
+  rank        Int              @default(100) // lower = more privileged; used for dashboards & display order
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  permissions RolePermission[]
+  users       UserRole[]
+}
+
+model Permission {
+  id          String           @id @default(cuid())
+  key         String           @unique
+  module      String
+  description String
+  roles       RolePermission[]
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+}
+
+/// A role grant. A non-global role is scoped to one of: a department, an academic unit
+/// (faculty/school/centre, including its descendants) or a campus. With none set it falls back to
+/// the user's own department. Scopes resolve to a set of department ids when the session is built.
+model UserRole {
+  id             String        @id @default(cuid())
+  userId         String
+  roleId         String
+  departmentId   String?
+  academicUnitId String?
+  campusId       String?
+  grantedById    String?
+  validUntil     DateTime?
+  createdAt      DateTime      @default(now())
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role           Role          @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  department     Department?   @relation(fields: [departmentId], references: [id])
+  academicUnit   AcademicUnit? @relation(fields: [academicUnitId], references: [id])
+  campus         Campus?       @relation(fields: [campusId], references: [id])
+
+  @@unique([userId, roleId, departmentId, academicUnitId, campusId])
+  @@index([roleId])
+}
+
+model Session {
+  id          String    @id @default(cuid())
+  userId      String
+  tokenHash   String    @unique
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime
+  lastSeenAt  DateTime  @default(now())
+  ip          String?
+  userAgent   String?
+  deviceLabel String?
+  remember    Boolean   @default(false)
+  mfaPending  Boolean   @default(false)
+  revokedAt   DateTime?
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model LoginAttempt {
+  id         String   @id @default(cuid())
+  identifier String
+  ip         String?
+  userAgent  String?
+  success    Boolean
+  reason     String?
+  createdAt  DateTime @default(now())
+
+  @@index([identifier, createdAt])
+  @@index([ip, createdAt])
+}
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ───────────────────────── Institution & Academics ─────────────────────────
+
+model Institution {
+  id          String       @id @default(cuid())
+  name        String
+  shortName   String
+  tagline     String?
+  address     String?
+  phone       String?
+  email       String?
+  website     String?
+  logoAssetId String?
+  timezone    String       @default("Asia/Kolkata")
+  locale      String       @default("en-IN")
+  currency    String       @default("INR")
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  departments Department[]
+  campuses    Campus[]
+  units       AcademicUnit[]
+}
+
+model Campus {
+  id            String         @id @default(cuid())
+  institutionId String
+  code          String         @unique
+  name          String
+  address       String?
+  isMain        Boolean        @default(false)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  deletedAt     DateTime?
+  institution   Institution    @relation(fields: [institutionId], references: [id])
+  departments   Department[]
+  units         AcademicUnit[]
+  roleGrants    UserRole[]
+  students      Student[]
+  buildings     Building[]
+  hostels       Hostel[]
+}
+
+/// Faculty, school, centre or division. Units nest (a faculty contains schools); departments hang off a unit.
+model AcademicUnit {
+  id            String           @id @default(cuid())
+  institutionId String
+  campusId      String?
+  parentId      String?
+  type          AcademicUnitType
+  code          String           @unique
+  name          String
+  headUserId    String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  deletedAt     DateTime?
+  institution   Institution      @relation(fields: [institutionId], references: [id])
+  campus        Campus?          @relation(fields: [campusId], references: [id])
+  parent        AcademicUnit?    @relation("UnitTree", fields: [parentId], references: [id])
+  children      AcademicUnit[]   @relation("UnitTree")
+  departments   Department[]
+  roleGrants    UserRole[]
+
+  @@index([parentId])
+}
+
+model Department {
+  id             String        @id @default(cuid())
+  institutionId  String
+  campusId       String?
+  academicUnitId String?
+  code           String        @unique
+  name           String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
+  institution    Institution   @relation(fields: [institutionId], references: [id])
+  campus         Campus?       @relation(fields: [campusId], references: [id])
+  academicUnit   AcademicUnit? @relation(fields: [academicUnitId], references: [id])
+  programs      Program[]
+  courses       Course[]
+  members       User[]       @relation("DepartmentMembers")
+  roleGrants    UserRole[]
+  recommendations SetterRecommendation[]
+  students       Student[]
+  positions      Position[]
+  employees      Employee[]
+  researchProjects ResearchProject[]
+  publications   Publication[]
+  announcements  Announcement[]
+}
+
+model Program {
+  id            String       @id @default(cuid())
+  departmentId  String
+  code          String       @unique
+  name          String
+  level         ProgramLevel
+  durationYears Int
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  deletedAt     DateTime?
+  department    Department   @relation(fields: [departmentId], references: [id])
+  courses       Course[]
+  sessions      ExaminationSession[]
+  batches       Batch[]
+  students      Student[]
+  curricula     Curriculum[]
+  resultRuns    ResultRun[]
+  feeStructures FeeStructure[]
+  announcements Announcement[]
+  admissionSeats AdmissionSeat[]
+  admissionApplications AdmissionApplication[]
+}
+
+model Regulation {
+  id                String    @id @default(cuid())
+  code              String    @unique
+  name              String
+  effectiveFromYear Int
+  description       String?
+  gradingSchemeId   String?
+  gradingScheme     GradingScheme? @relation(fields: [gradingSchemeId], references: [id])
+  createdAt         DateTime  @default(now())
+  courses           Course[]
+  batches           Batch[]
+  curricula         Curriculum[]
+}
+
+model AcademicYear {
+  id        String               @id @default(cuid())
+  label     String               @unique // e.g. 2026-27
+  startDate DateTime
+  endDate   DateTime
+  isCurrent Boolean              @default(false)
+  createdAt DateTime             @default(now())
+  sessions  ExaminationSession[]
+  terms     AcademicTerm[]
+  feeStructures FeeStructure[]
+  scholarshipApplications ScholarshipApplication[]
+  accreditationCycles AccreditationCycle[]
+  admissionCycles AdmissionCycle[]
+}
+
+model Semester {
+  id       String   @id @default(cuid())
+  number   Int      @unique
+  name     String
+  termType TermType
+  courses  Course[]
+}
+
+model Course {
+  id              String       @id @default(cuid())
+  code            String
+  title           String
+  credits         Int
+  departmentId    String
+  programId       String
+  semesterId      String
+  regulationId    String
+  courseType      CourseType
+  mode            CourseMode   @default(THEORY)
+  maxMarks        Int
+  internalMarks   Int
+  externalMarks   Int
+  durationMinutes Int
+  syllabus        String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  deletedAt       DateTime?
+  department      Department   @relation(fields: [departmentId], references: [id])
+  program         Program      @relation(fields: [programId], references: [id])
+  semester        Semester     @relation(fields: [semesterId], references: [id])
+  regulation      Regulation   @relation(fields: [regulationId], references: [id])
+  units           CourseUnit[]
+  outcomes        LearningOutcome[]
+  questions       Question[]
+  examinations    Examination[]
+  blueprints      Blueprint[]
+  offerings       CourseOffering[]
+  results         CourseResult[]
+  prerequisites   CoursePrerequisite[] @relation("CoursePrerequisites")
+  prerequisiteOf  CoursePrerequisite[] @relation("PrerequisiteOf")
+  curricula       CurriculumCourse[]
+
+  @@unique([code, regulationId])
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "Course_title_trgm_idx")
+  @@index([departmentId])
+  @@index([programId])
+}
+
+model CourseUnit {
+  id          String        @id @default(cuid())
+  courseId    String
+  number      Int
+  title       String
+  hours       Int?
+  description String?
+  course      Course        @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  topics      CourseTopic[]
+  questions   Question[]
+
+  @@unique([courseId, number])
+}
+
+model CourseTopic {
+  id        String     @id @default(cuid())
+  unitId    String
+  title     String
+  order     Int        @default(0)
+  unit      CourseUnit @relation(fields: [unitId], references: [id], onDelete: Cascade)
+  questions Question[]
+
+  @@index([unitId])
+}
+
+model LearningOutcome {
+  id          String      @id @default(cuid())
+  courseId    String
+  code        String // CO1, CO2 …
+  description String
+  bloom       BloomLevel?
+  course      Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  questions   Question[]
+
+  @@unique([courseId, code])
+}
+
+// ───────────────────────── Examinations ─────────────────────────
+
+model ExaminationSession {
+  id             String        @id @default(cuid())
+  name           String
+  code           String        @unique // e.g. NOV2026
+  academicYearId String
+  termType       TermType
+  examType       ExamType      @default(REGULAR)
+  status         SessionStatus @default(PLANNING)
+  startDate      DateTime
+  endDate        DateTime
+  settingDeadline    DateTime?
+  moderationDeadline DateTime?
+  scrutinyDeadline   DateTime?
+  approvalDeadline   DateTime?
+  termId         String?
+  revaluationUntil   DateTime?
+  description    String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  academicYear   AcademicYear  @relation(fields: [academicYearId], references: [id])
+  term           AcademicTerm? @relation(fields: [termId], references: [id])
+  programs       Program[]
+  examinations   Examination[]
+  registrations  ExamRegistration[]
+  duties         InvigilationDuty[]
+  resultRuns     ResultRun[]
+
+  @@index([status])
+}
+
+/// The examination of one course inside a session.
+model Examination {
+  id              String             @id @default(cuid())
+  sessionId       String
+  courseId        String
+  blueprintId     String?
+  templateId      String?
+  moderatorId     String?
+  scrutinizerId   String?
+  maxMarks        Int
+  durationMinutes Int
+  isLocked        Boolean            @default(false)
+  notes           String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  session         ExaminationSession @relation(fields: [sessionId], references: [id])
+  course          Course             @relation(fields: [courseId], references: [id])
+  blueprint       Blueprint?         @relation(fields: [blueprintId], references: [id])
+  template        Template?          @relation(fields: [templateId], references: [id])
+  moderator       User?              @relation("ExamModerator", fields: [moderatorId], references: [id])
+  scrutinizer     User?              @relation("ExamScrutinizer", fields: [scrutinizerId], references: [id])
+  schedule        ExamSchedule?
+  papers          QuestionPaper[]
+  assignments     SetterAssignment[]
+  usages          QuestionUsage[]
+  recommendations SetterRecommendation[]
+  registrations   ExamRegistration[]
+  components      AssessmentComponent[]
+  scripts         AnswerScript[]
+
+  @@unique([sessionId, courseId])
+  @@index([moderatorId])
+  @@index([scrutinizerId])
+}
+
+model ExamSchedule {
+  id            String      @id @default(cuid())
+  examinationId String      @unique
+  date          DateTime
+  slot          ExamSlot
+  startsAt      DateTime
+  endsAt        DateTime
+  venue         String?
+  examination   Examination @relation(fields: [examinationId], references: [id], onDelete: Cascade)
+
+  @@index([date])
+}
+
+// ───────────────────────── Question bank ─────────────────────────
+
+model Tag {
+  id        String        @id @default(cuid())
+  name      String        @unique
+  questions QuestionTag[]
+}
+
+model Question {
+  id               String         @id @default(cuid())
+  code             String         @unique // human readable, e.g. Q-000123
+  courseId         String
+  unitId           String
+  topicId          String?
+  outcomeId        String?
+  type             QuestionType
+  bloom            BloomLevel
+  difficulty       Difficulty
+  marks            Int
+  estimatedMinutes Int
+  status           QuestionStatus @default(ACTIVE)
+  authorId         String
+  currentVersion   Int            @default(1)
+  plainText        String // denormalised text of the current version (search + duplicate detection)
+  searchText       String         @default("") // text + keywords + tags, feeds the generated tsvector column
+  keywords         String[]
+  usageCount       Int            @default(0)
+  lastUsedAt       DateTime?
+  lastUsedSessionId String?
+  search           Unsupported("tsvector")? @default(dbgenerated("to_tsvector('english'::regconfig, COALESCE(\"searchText\", ''::text))"))
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  deletedAt        DateTime?
+  course           Course         @relation(fields: [courseId], references: [id])
+  unit             CourseUnit     @relation(fields: [unitId], references: [id])
+  topic            CourseTopic?   @relation(fields: [topicId], references: [id])
+  outcome          LearningOutcome? @relation(fields: [outcomeId], references: [id])
+  author           User           @relation("QuestionAuthor", fields: [authorId], references: [id])
+  versions         QuestionVersion[]
+  tags             QuestionTag[]
+  usages           QuestionUsage[]
+  paperItems       QuestionPaperItem[]
+
+  @@index([courseId, unitId])
+  @@index([courseId, difficulty, bloom])
+  @@index([courseId, marks])
+  @@index([status])
+  @@index([authorId])
+  @@index([usageCount])
+  @@index([createdAt])
+  @@index([search], type: Gin, map: "Question_search_idx")
+  @@index([plainText(ops: raw("gin_trgm_ops"))], type: Gin, map: "Question_plainText_trgm_idx")
+}
+
+/// Immutable snapshot of a question's content. Papers reference versions, so history stays reproducible.
+model QuestionVersion {
+  id          String       @id @default(cuid())
+  questionId  String
+  version     Int
+  body        String // EXAMCORE markdown subset (math, tables, code, images via asset:)
+  options     Json? // MCQ / match / assertion data
+  answerKey   String?
+  marks       Int
+  difficulty  Difficulty
+  bloom       BloomLevel
+  type        QuestionType
+  changeNote  String?
+  createdById String
+  createdAt   DateTime     @default(now())
+  question    Question     @relation(fields: [questionId], references: [id])
+  createdBy   User         @relation(fields: [createdById], references: [id])
+  paperItems  QuestionPaperItem[]
+  usages      QuestionUsage[]
+
+  @@unique([questionId, version])
+}
+
+model QuestionTag {
+  questionId String
+  tagId      String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  tag        Tag      @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([questionId, tagId])
+  @@index([tagId])
+}
+
+/// Permanent record of a question appearing in a finalised paper. Never deleted.
+model QuestionUsage {
+  id                String          @id @default(cuid())
+  questionId        String
+  questionVersionId String
+  paperId           String
+  examinationId     String
+  sessionId         String
+  usedAt            DateTime        @default(now())
+  question          Question        @relation(fields: [questionId], references: [id])
+  questionVersion   QuestionVersion @relation(fields: [questionVersionId], references: [id])
+  paper             QuestionPaper   @relation(fields: [paperId], references: [id])
+  examination       Examination     @relation(fields: [examinationId], references: [id])
+
+  @@unique([questionId, paperId])
+  @@index([questionId, usedAt])
+  @@index([sessionId])
+}
+
+model SavedFilter {
+  id        String   @id @default(cuid())
+  userId    String
+  scope     String
+  name      String
+  query     Json
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, scope])
+}
+
+// ───────────────────────── Blueprints ─────────────────────────
+
+model Blueprint {
+  id              String             @id @default(cuid())
+  name            String
+  description     String?
+  courseId        String? // null = reusable paper pattern
+  totalMarks      Int
+  durationMinutes Int
+  isPattern       Boolean            @default(false)
+  createdById     String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  deletedAt       DateTime?
+  course          Course?            @relation(fields: [courseId], references: [id])
+  sections        BlueprintSection[]
+  rules           BlueprintRule[]
+  examinations    Examination[]
+  papers          QuestionPaper[]
+  assignments     SetterAssignment[]
+}
+
+model BlueprintSection {
+  id               String         @id @default(cuid())
+  blueprintId      String
+  order            Int
+  label            String // A, B, C
+  title            String
+  instructions     String?
+  questionCount    Int
+  attemptCount     Int // answer any N of questionCount
+  marksPerQuestion Int
+  questionTypes    QuestionType[]
+  units            Int[] // required unit numbers (empty = any)
+  blueprint        Blueprint      @relation(fields: [blueprintId], references: [id], onDelete: Cascade)
+
+  @@unique([blueprintId, label])
+}
+
+/// Distribution rule, e.g. DIFFICULTY/EASY = 30% ± 5.
+model BlueprintRule {
+  id            String             @id @default(cuid())
+  blueprintId   String
+  dimension     BlueprintDimension
+  key           String
+  targetPercent Float
+  tolerance     Float              @default(5)
+  blueprint     Blueprint          @relation(fields: [blueprintId], references: [id], onDelete: Cascade)
+
+  @@unique([blueprintId, dimension, key])
+}
+
+// ───────────────────────── Setter assignments ─────────────────────────
+
+model SetterAssignment {
+  id             String           @id @default(cuid())
+  examinationId  String
+  setterId       String
+  backupSetterId String?
+  assignedById   String
+  blueprintId    String?
+  setLabel       String           @default("A")
+  deadline       DateTime
+  instructions   String?
+  status         AssignmentStatus @default(ASSIGNED)
+  respondedAt    DateTime?
+  declineReason  String?
+  submittedAt    DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  examination    Examination      @relation(fields: [examinationId], references: [id])
+  setter         User             @relation("AssignmentSetter", fields: [setterId], references: [id])
+  backupSetter   User?            @relation("AssignmentBackupSetter", fields: [backupSetterId], references: [id])
+  assignedBy     User             @relation("AssignmentCreator", fields: [assignedById], references: [id])
+  blueprint      Blueprint?       @relation(fields: [blueprintId], references: [id])
+  paper          QuestionPaper?
+
+  @@unique([examinationId, setLabel])
+  @@index([setterId, status])
+  @@index([deadline])
+}
+
+model SetterRecommendation {
+  id            String      @id @default(cuid())
+  examinationId String
+  departmentId  String
+  setterId      String
+  recommenderId String
+  note          String?
+  createdAt     DateTime    @default(now())
+  examination   Examination @relation(fields: [examinationId], references: [id])
+  department    Department  @relation(fields: [departmentId], references: [id])
+  setter        User        @relation("RecommendedSetter", fields: [setterId], references: [id])
+  recommender   User        @relation("Recommender", fields: [recommenderId], references: [id])
+
+  @@unique([examinationId, setterId])
+}
+
+// ───────────────────────── Question papers ─────────────────────────
+
+model QuestionPaper {
+  id             String        @id @default(cuid())
+  code           String        @unique
+  examinationId  String
+  assignmentId   String?       @unique
+  setterId       String
+  blueprintId    String?
+  setLabel       String        @default("A")
+  title          String
+  instructions   String?
+  status         PaperStatus   @default(DRAFT)
+  revision       Int           @default(0) // optimistic concurrency token
+  versionMajor   Int           @default(0)
+  versionMinor   Int           @default(0)
+  revisionCount  Int           @default(0) // times returned for revision
+  submittedAt    DateTime?
+  approvedAt     DateTime?
+  lockedAt       DateTime?
+  lockedById     String?
+  releasedAt     DateTime?
+  archivedAt     DateTime?
+  finalHash      String? // sha256 of the locked snapshot
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
+  examination    Examination   @relation(fields: [examinationId], references: [id])
+  assignment     SetterAssignment? @relation(fields: [assignmentId], references: [id])
+  setter         User          @relation("PaperSetter", fields: [setterId], references: [id])
+  blueprint      Blueprint?    @relation(fields: [blueprintId], references: [id])
+  sections       QuestionPaperSection[]
+  versions       QuestionPaperVersion[]
+  moderations    Moderation[]
+  scrutinies     Scrutiny[]
+  approvals      Approval[]
+  transitions    PaperTransition[]
+  usages         QuestionUsage[]
+  comments       ModerationComment[]
+
+  @@index([examinationId])
+  @@index([setterId])
+  @@index([status])
+}
+
+model QuestionPaperSection {
+  id               String                 @id @default(cuid())
+  paperId          String
+  parentId         String?
+  order            Int
+  label            String
+  title            String
+  instructions     String?
+  attemptCount     Int?
+  marksPerQuestion Int?
+  paper            QuestionPaper          @relation(fields: [paperId], references: [id], onDelete: Cascade)
+  parent           QuestionPaperSection?  @relation("SubSections", fields: [parentId], references: [id], onDelete: Cascade)
+  children         QuestionPaperSection[] @relation("SubSections")
+  items            QuestionPaperItem[]
+
+  @@index([paperId, order])
+}
+
+model QuestionPaperItem {
+  id                String               @id @default(cuid())
+  sectionId         String
+  order             Int
+  questionId        String
+  questionVersionId String
+  marks             Int
+  section           QuestionPaperSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  question          Question             @relation(fields: [questionId], references: [id])
+  questionVersion   QuestionVersion      @relation(fields: [questionVersionId], references: [id])
+  comments          ModerationComment[]
+
+  @@index([sectionId, order])
+  @@index([questionId])
+}
+
+/// Immutable snapshot of the full paper at a workflow milestone.
+model QuestionPaperVersion {
+  id          String        @id @default(cuid())
+  paperId     String
+  major       Int
+  minor       Int
+  label       String // "1.2", "2.0 FINAL"
+  isFinal     Boolean       @default(false)
+  status      PaperStatus
+  snapshot    Json
+  contentHash String
+  reason      String
+  createdById String
+  createdAt   DateTime      @default(now())
+  paper       QuestionPaper @relation(fields: [paperId], references: [id])
+  createdBy   User          @relation(fields: [createdById], references: [id])
+
+  @@unique([paperId, major, minor])
+}
+
+/// Log of every state-machine transition (in addition to the audit log).
+model PaperTransition {
+  id        String        @id @default(cuid())
+  paperId   String
+  from      PaperStatus
+  to        PaperStatus
+  action    String
+  actorId   String
+  note      String?
+  createdAt DateTime      @default(now())
+  paper     QuestionPaper @relation(fields: [paperId], references: [id])
+  actor     User          @relation(fields: [actorId], references: [id])
+
+  @@index([paperId, createdAt])
+}
+
+// ───────────────────────── Review workflow ─────────────────────────
+
+model Moderation {
+  id          String           @id @default(cuid())
+  paperId     String
+  moderatorId String
+  round       Int              @default(1)
+  status      ModerationStatus @default(PENDING)
+  checklist   Json? // { checkKey: { ok: boolean, note?: string } }
+  summary     String?
+  versionLabel String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime         @default(now())
+  paper       QuestionPaper    @relation(fields: [paperId], references: [id])
+  moderator   User             @relation("Moderator", fields: [moderatorId], references: [id])
+  comments    ModerationComment[]
+
+  @@unique([paperId, round])
+  @@index([moderatorId, status])
+}
+
+model ModerationComment {
+  id                  String                @id @default(cuid())
+  moderationId        String?
+  paperId             String
+  itemId              String?
+  authorId            String
+  kind                ModerationCommentKind @default(COMMENT)
+  body                String
+  suggestedQuestionId String?
+  resolved            Boolean               @default(false)
+  createdAt           DateTime              @default(now())
+  moderation          Moderation?           @relation(fields: [moderationId], references: [id])
+  paper               QuestionPaper         @relation(fields: [paperId], references: [id])
+  item                QuestionPaperItem?    @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  author              User                  @relation(fields: [authorId], references: [id])
+
+  @@index([paperId])
+}
+
+model Scrutiny {
+  id           String         @id @default(cuid())
+  paperId      String
+  officerId    String
+  round        Int            @default(1)
+  status       ScrutinyStatus @default(PENDING)
+  checks       Json? // automatic + manual check results
+  remarks      String?
+  versionLabel String?
+  completedAt  DateTime?
+  createdAt    DateTime       @default(now())
+  paper        QuestionPaper  @relation(fields: [paperId], references: [id])
+  officer      User           @relation("ScrutinyOfficer", fields: [officerId], references: [id])
+
+  @@unique([paperId, round])
+  @@index([officerId, status])
+}
+
+model Approval {
+  id           String           @id @default(cuid())
+  paperId      String
+  approverId   String
+  decision     ApprovalDecision
+  remarks      String?
+  versionLabel String
+  createdAt    DateTime         @default(now())
+  paper        QuestionPaper    @relation(fields: [paperId], references: [id])
+  approver     User             @relation(fields: [approverId], references: [id])
+
+  @@index([paperId])
+}
+
+// ───────────────────────── Platform ─────────────────────────
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  body      String?
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+}
+
+/// Outbound e-mail queue. A delivery worker/provider adapter drains it; in development mails stay here.
+model EmailOutbox {
+  id        String    @id @default(cuid())
+  to        String
+  subject   String
+  text      String
+  status    String    @default("QUEUED")
+  sentAt    DateTime?
+  error     String?
+  createdAt DateTime  @default(now())
+
+  @@index([status, createdAt])
+}
+
+/// Append-only, hash-chained audit trail. UPDATE/DELETE are blocked by a database trigger.
+model AuditLog {
+  id           BigInt   @id @default(autoincrement())
+  actorId      String?
+  actorName    String?
+  action       String
+  resourceType String
+  resourceId   String?
+  summary      String?
+  ip           String?
+  userAgent    String?
+  oldValue     Json?
+  newValue     Json?
+  metadata     Json?
+  prevHash     String?
+  hash         String
+  createdAt    DateTime @default(now())
+
+  @@index([actorId, createdAt])
+  @@index([resourceType, resourceId])
+  @@index([action, createdAt])
+  @@index([createdAt])
+}
+
+model FileAsset {
+  id           String    @id @default(cuid())
+  storageKey   String    @unique
+  originalName String
+  mimeType     String
+  size         Int
+  sha256       String
+  kind         FileKind
+  ownerId      String?
+  createdAt    DateTime  @default(now())
+  deletedAt    DateTime?
+  owner        User?     @relation(fields: [ownerId], references: [id])
+  learningItems LearningItem[]
+  metricEvidence MetricEvidence[]
+  studentDocuments StudentDocument[]
+  submissionFiles SubmissionFile[]
+}
+
+model Template {
+  id              String       @id @default(cuid())
+  name            String
+  kind            TemplateKind @default(PAPER)
+  isDefault       Boolean      @default(false)
+  headerTitle     String?
+  headerSubtitle  String?
+  showLogo        Boolean      @default(true)
+  instructions    String?
+  footerText      String?
+  fontFamily      String       @default("Times New Roman")
+  fontSizePt      Int          @default(12)
+  marginMm        Int          @default(18)
+  showRegNoBoxes  Boolean      @default(true)
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  examinations    Examination[]
+}
+
+model Watermark {
+  id        String   @id @default(cuid())
+  name      String
+  text      String // supports {USER} {SESSION} {TIMESTAMP} {PAPER}
+  opacity   Float    @default(0.08)
+  angle     Int      @default(-30)
+  appliesTo String[] // PREVIEW, DRAFT_PDF, MODERATION_PDF, FINAL_PDF
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model SystemSetting {
+  key         String   @id
+  value       Json
+  updatedById String?
+  updatedAt   DateTime @updatedAt
+}

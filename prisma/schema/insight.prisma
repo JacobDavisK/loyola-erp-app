@@ -1,0 +1,44 @@
+// ───────────────────────── Report builder and AI gateway ─────────────────────────
+
+/// A saved report definition: dataset + columns + filters + grouping (validated by src/server/reports).
+model SavedReport {
+  id          String   @id @default(cuid())
+  name        String
+  dataset     String
+  definition  Json
+  ownerId     String
+  /// Shared reports are visible to everyone who can read the dataset (scope still applies per viewer)
+  shared      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  owner       User     @relation("SavedReportOwner", fields: [ownerId], references: [id])
+
+  @@index([ownerId])
+  @@index([shared, dataset])
+}
+
+enum AiStatus {
+  OK
+  ERROR
+  REFUSED
+}
+
+/// One call to the AI provider. Prompts and outputs are not stored — only a hash, sizes and usage.
+model AiRequest {
+  id           String   @id @default(cuid())
+  userId       String
+  feature      String
+  provider     String
+  model        String
+  promptHash   String
+  inputTokens  Int      @default(0)
+  outputTokens Int      @default(0)
+  latencyMs    Int      @default(0)
+  status       AiStatus
+  error        String?
+  createdAt    DateTime @default(now())
+  user         User     @relation("AiRequestUser", fields: [userId], references: [id])
+
+  @@index([userId, createdAt])
+  @@index([createdAt])
+}

@@ -1,0 +1,77 @@
+EXAMCORE 1.0 - University Examination & Question Paper Management System
+=========================================================================
+
+This package runs EXAMCORE on one computer with demo data (Example University),
+for evaluation and training. It is not set up for real examinations: see the
+"Production deployment" section of README.md for that.
+
+
+WHAT YOU NEED
+-------------
+- Windows 10 or 11 (64-bit).
+- Node.js 20.9 or newer. Install the "LTS" version from https://nodejs.org
+  (accept the defaults) and restart the computer if asked.
+- Internet access for the first setup only (about 600 MB of downloads).
+- About 2 GB of free disk space and 4 GB of RAM.
+- Microsoft Edge or Google Chrome (Edge is already on every Windows PC). It is
+  used to produce PDF question papers.
+
+
+FIRST-TIME SETUP (once, 10-30 minutes)
+--------------------------------------
+1. Extract this zip to a folder, for example C:\EXAMCORE.
+   Don't run it from inside the zip, and avoid OneDrive-synced folders.
+2. Double-click  setup.bat  and wait for "Setup complete".
+   If Windows shows "Windows protected your PC", choose More info > Run anyway.
+   If the firewall asks about Node.js, "Private networks" is enough.
+
+
+EVERY TIME YOU USE IT
+---------------------
+1. Double-click  start.bat
+2. The browser opens at  http://localhost:3100  after a few seconds.
+3. Keep the black window open while you work.
+   To stop EXAMCORE, press Ctrl+C in that window (or close it).
+
+
+SIGN IN
+-------
+All demo accounts use the password:   Examcore@2026
+
+  Role                        E-mail
+  --------------------------  ---------------------------
+  Controller of Examinations  controller@example.edu
+  Paper setter                setter@example.edu
+  Moderator                   moderator@example.edu
+  Scrutiny officer            scrutiny@example.edu
+  Approver (Dean)             approver@example.edu
+  Head of department (CS)     hod.cs@example.edu
+  Examination cell            examcell@example.edu
+  Auditor                     auditor@example.edu
+  Super admin                 admin@example.edu
+
+A five-minute walkthrough is in README.md, and the full user manual is
+docs\EXAMCORE-Training-Manual.pdf.
+
+
+GOOD TO KNOW
+------------
+- Use it on this computer only, at http://localhost:3100. Opening it from
+  another computer on the network needs HTTPS and a changed APP_URL
+  (see README.md), otherwise sign-in will not work.
+- Your data is kept between runs in the .pgdata and storage folders.
+- To reset everything to the original demo data: stop EXAMCORE, delete the
+  .pgdata and storage folders, then run setup.bat again.
+- The .env file holds this computer's secret keys. Don't share it.
+
+
+TROUBLESHOOTING
+---------------
+"Node.js is not installed"   Install Node.js LTS, restart, run setup.bat again.
+"Port 3100 is already in use"  EXAMCORE is already running in another window,
+                               or another program uses that port.
+Setup stops during "npm ci"  Check the internet connection (a proxy or
+                               firewall may block npm) and run setup.bat again.
+PDF download fails           Install Microsoft Edge or Google Chrome, delete
+                               the CHROMIUM_PATH line's value in .env, and run
+                               setup.bat again.

@@ -1,0 +1,417 @@
+// ───────────────────────── Examination operations, marks, results & credentials ─────────────────────────
+
+enum ExamRegStatus {
+  ELIGIBLE
+  NOT_ELIGIBLE
+  CONDONATION_PENDING
+  REGISTERED
+  CANCELLED
+}
+
+enum ExamFeeStatus {
+  NOT_REQUIRED
+  PENDING
+  PAID
+  WAIVED
+}
+
+enum SeatRole {
+  CHIEF_SUPERINTENDENT
+  INVIGILATOR
+  RELIEVER
+}
+
+enum AssessmentKind {
+  INTERNAL
+  EXTERNAL
+  PRACTICAL
+  VIVA
+  PROJECT
+}
+
+enum MarkSheetStatus {
+  DRAFT
+  SUBMITTED
+  VERIFIED
+  APPROVED
+  RETURNED
+}
+
+enum MarkStatus {
+  PRESENT
+  ABSENT
+  MALPRACTICE
+  EXEMPT
+}
+
+enum ScriptStatus {
+  PENDING
+  IN_VALUATION
+  VALUED
+  THIRD_VALUATION
+  FINAL
+}
+
+enum GradingStatus {
+  DRAFT
+  ACTIVE
+  RETIRED
+}
+
+enum ResultRunStatus {
+  DRAFT
+  COMPUTED
+  IN_APPROVAL
+  APPROVED
+  PUBLISHED
+}
+
+enum CourseResultStatus {
+  PASS
+  FAIL
+  ABSENT
+  WITHHELD
+  INCOMPLETE
+}
+
+enum RevaluationType {
+  RETOTALLING
+  REVALUATION
+}
+
+enum RevaluationStatus {
+  REQUESTED
+  FEE_PENDING
+  IN_PROGRESS
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+enum CredentialType {
+  TRANSCRIPT
+  MARKSHEET
+  PROVISIONAL_CERTIFICATE
+  DEGREE_CERTIFICATE
+  MIGRATION_CERTIFICATE
+  BONAFIDE_CERTIFICATE
+  COURSE_COMPLETION
+  RANK_CERTIFICATE
+  TRANSFER_CERTIFICATE
+}
+
+enum CredentialStatus {
+  ISSUED
+  REVOKED
+  SUPERSEDED
+}
+
+/// A student's entry for one course examination in a session.
+model ExamRegistration {
+  id            String          @id @default(cuid())
+  sessionId     String
+  examinationId String
+  studentId     String
+  attemptType   AttemptType     @default(REGULAR)
+  status        ExamRegStatus
+  reasons       String[] // why not eligible (attendance shortage, dues, status…)
+  attendancePct Float?
+  feeStatus     ExamFeeStatus   @default(NOT_REQUIRED)
+  hallTicketNo  String?         @unique
+  dummyNo       String?         @unique // anonymous code on the answer script
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  session       ExaminationSession @relation(fields: [sessionId], references: [id])
+  examination   Examination     @relation(fields: [examinationId], references: [id])
+  student       Student         @relation(fields: [studentId], references: [id])
+  seat          ExamSeat?
+  script        AnswerScript?
+
+  @@unique([examinationId, studentId])
+  @@index([sessionId, studentId])
+  @@index([status])
+}
+
+/// Seat for one examination sitting (date + slot) in a room.
+model ExamSeat {
+  id             String           @id @default(cuid())
+  registrationId String           @unique
+  roomId         String
+  date           DateTime         @db.Date
+  slot           ExamSlot
+  seatNo         Int
+  createdAt      DateTime         @default(now())
+  registration   ExamRegistration @relation(fields: [registrationId], references: [id], onDelete: Cascade)
+  room           Room             @relation(fields: [roomId], references: [id])
+
+  @@unique([roomId, date, slot, seatNo])
+  @@index([date, slot])
+}
+
+model InvigilationDuty {
+  id        String   @id @default(cuid())
+  sessionId String
+  roomId    String
+  userId    String
+  date      DateTime @db.Date
+  slot      ExamSlot
+  role      SeatRole @default(INVIGILATOR)
+  createdAt DateTime @default(now())
+  session   ExaminationSession @relation(fields: [sessionId], references: [id])
+  room      Room     @relation(fields: [roomId], references: [id])
+  user      User     @relation("Invigilator", fields: [userId], references: [id])
+
+  @@unique([userId, date, slot])
+  @@index([sessionId, date, slot])
+}
+
+/// A graded component of a class (internal tests, assignments, practical, the end-semester exam…).
+/// Components are scaled into the course's internal/external maximum by weight.
+model AssessmentComponent {
+  id            String         @id @default(cuid())
+  offeringId    String
+  examinationId String? // external component fed by answer-script valuation
+  name          String
+  kind          AssessmentKind
+  maxMarks      Float
+  /// Marks this component contributes to the course total (e.g. 10 of the 25 internal marks)
+  weight        Float
+  order         Int            @default(0)
+  createdAt     DateTime       @default(now())
+  offering      CourseOffering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  examination   Examination?   @relation(fields: [examinationId], references: [id])
+  sheet         MarkSheet?
+  marks         Mark[]
+
+  @@unique([offeringId, name])
+}
+
+/// Workflow wrapper for a component's marks: entered → submitted → verified (HoD) → approved.
+model MarkSheet {
+  id          String              @id @default(cuid())
+  componentId String              @unique
+  status      MarkSheetStatus     @default(DRAFT)
+  submittedAt DateTime?
+  submittedById String?
+  approvedAt  DateTime?
+  updatedAt   DateTime            @updatedAt
+  component   AssessmentComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
+}
+
+model Mark {
+  id          String              @id @default(cuid())
+  componentId String
+  studentId   String
+  marks       Float?
+  status      MarkStatus          @default(PRESENT)
+  enteredById String
+  updatedAt   DateTime            @updatedAt
+  component   AssessmentComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  student     Student             @relation(fields: [studentId], references: [id])
+  revisions   MarkRevision[]
+
+  @@unique([componentId, studentId])
+}
+
+/// Every change to a mark after its sheet was submitted. Append-only.
+model MarkRevision {
+  id         String      @id @default(cuid())
+  markId     String
+  oldMarks   Float?
+  newMarks   Float?
+  oldStatus  MarkStatus
+  newStatus  MarkStatus
+  reason     String
+  changedById String
+  createdAt  DateTime    @default(now())
+  mark       Mark        @relation(fields: [markId], references: [id])
+
+  @@index([markId])
+}
+
+/// A physical answer script, identified to valuers only by its dummy number.
+model AnswerScript {
+  id             String            @id @default(cuid())
+  registrationId String            @unique
+  examinationId  String
+  status         ScriptStatus      @default(PENDING)
+  absent         Boolean           @default(false) // candidate did not sit the examination
+  malpractice    Boolean           @default(false)
+  finalMarks     Float?
+  finalizedAt    DateTime?
+  createdAt      DateTime          @default(now())
+  registration   ExamRegistration  @relation(fields: [registrationId], references: [id])
+  examination    Examination       @relation(fields: [examinationId], references: [id])
+  valuations     ScriptValuation[]
+
+  @@index([examinationId, status])
+}
+
+model ScriptValuation {
+  id         String       @id @default(cuid())
+  scriptId   String
+  round      Int // 1, 2 (double valuation), 3 (third valuation on large difference), 10+ revaluation
+  valuerId   String
+  marks      Float?
+  remarks    String?
+  assignedAt DateTime     @default(now())
+  submittedAt DateTime?
+  script     AnswerScript @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+  valuer     User         @relation("Valuer", fields: [valuerId], references: [id])
+
+  @@unique([scriptId, round])
+  @@index([valuerId, submittedAt])
+}
+
+/// Versioned grading scheme. Results record the scheme version used, so they can be recomputed identically.
+model GradingScheme {
+  id                 String        @id @default(cuid())
+  code               String
+  version            Int
+  name               String
+  status             GradingStatus @default(DRAFT)
+  /// [{ grade, minPercent, gradePoint, pass }] ordered from highest
+  bands              Json
+  passPercent        Float // minimum overall %
+  minExternalPercent Float         @default(0) // minimum in the end-semester component
+  minInternalPercent Float         @default(0)
+  absentGrade        String        @default("AB")
+  failGrade          String        @default("RA")
+  withheldGrade      String        @default("WH")
+  graceMaxPerCourse  Float         @default(0) // marks
+  graceMaxTotal      Float         @default(0) // marks per student per result run
+  gpaDecimals        Int           @default(2)
+  createdAt          DateTime      @default(now())
+  regulations        Regulation[]
+  runs               ResultRun[]
+
+  @@unique([code, version])
+}
+
+/// One result-processing run: an examination session for a programme (or all programmes).
+model ResultRun {
+  id              String          @id @default(cuid())
+  sessionId       String
+  programId       String?
+  termId          String
+  gradingSchemeId String
+  status          ResultRunStatus @default(DRAFT)
+  stats           Json?
+  computedAt      DateTime?
+  computedById    String?
+  publishedAt     DateTime?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  session         ExaminationSession @relation(fields: [sessionId], references: [id])
+  program         Program?        @relation(fields: [programId], references: [id])
+  term            AcademicTerm    @relation(fields: [termId], references: [id])
+  gradingScheme   GradingScheme   @relation(fields: [gradingSchemeId], references: [id])
+  courseResults   CourseResult[]
+  termResults     TermResult[]
+
+  @@index([sessionId])
+}
+
+/// A student's result in one course for one attempt. Never overwritten after publication: a revision
+/// (revaluation, correction) inserts a new version and marks the previous one not current.
+model CourseResult {
+  id            String             @id @default(cuid())
+  runId         String
+  studentId     String
+  courseId      String
+  termId        String
+  attempt       Int                @default(1)
+  attemptType   AttemptType        @default(REGULAR)
+  version       Int                @default(1)
+  isCurrent     Boolean            @default(true)
+  internalMarks Float?
+  externalMarks Float?
+  graceMarks    Float              @default(0)
+  totalMarks    Float?
+  maxMarks      Float
+  percent       Float?
+  grade         String
+  gradePoint    Float
+  credits       Float
+  creditPoints  Float
+  status        CourseResultStatus
+  withheldReason String?
+  revisionReason String?
+  publishedAt   DateTime?
+  createdAt     DateTime           @default(now())
+  run           ResultRun          @relation(fields: [runId], references: [id])
+  student       Student            @relation(fields: [studentId], references: [id])
+  course        Course             @relation(fields: [courseId], references: [id])
+  revaluations  RevaluationRequest[]
+
+  @@index([studentId, isCurrent])
+  @@index([runId])
+  @@index([courseId, termId])
+}
+
+model TermResult {
+  id                String     @id @default(cuid())
+  runId             String
+  studentId         String
+  termId            String
+  version           Int        @default(1)
+  isCurrent         Boolean    @default(true)
+  creditsRegistered Float
+  creditsEarned     Float
+  creditPoints      Float
+  sgpa              Float?
+  cgpa              Float?
+  cumulativeCredits Float
+  status            String // PASS, FAIL_SOME, WITHHELD
+  publishedAt       DateTime?
+  createdAt         DateTime   @default(now())
+  run               ResultRun  @relation(fields: [runId], references: [id])
+  student           Student    @relation(fields: [studentId], references: [id])
+
+  @@index([studentId, isCurrent])
+  @@index([runId])
+}
+
+model RevaluationRequest {
+  id             String            @id @default(cuid())
+  courseResultId String
+  studentId      String
+  type           RevaluationType
+  status         RevaluationStatus @default(REQUESTED)
+  fee            Float             @default(0)
+  originalMarks  Float?
+  revisedMarks   Float?
+  outcome        String? // UNCHANGED, INCREASED, DECREASED
+  remarks        String?
+  requestedAt    DateTime          @default(now())
+  completedAt    DateTime?
+  decidedById    String?
+  courseResult   CourseResult      @relation(fields: [courseResultId], references: [id])
+  student        Student           @relation(fields: [studentId], references: [id])
+
+  @@index([studentId])
+  @@index([status])
+}
+
+/// An issued transcript or certificate. The payload is a frozen snapshot; the seal lets anyone verify
+/// it has not been altered, via the public /verify/<code> page.
+model IssuedCredential {
+  id               String           @id @default(cuid())
+  type             CredentialType
+  serialNo         String           @unique
+  verificationCode String           @unique
+  studentId        String
+  title            String
+  payload          Json
+  contentHash      String
+  seal             String // HMAC over the canonical payload with the credential-signing key
+  status           CredentialStatus @default(ISSUED)
+  issuedById       String?
+  issuedAt         DateTime         @default(now())
+  revokedAt        DateTime?
+  revokeReason     String?
+  supersededById   String?
+  student          Student          @relation(fields: [studentId], references: [id])
+
+  @@index([studentId, type])
+}

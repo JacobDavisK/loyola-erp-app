@@ -1,0 +1,419 @@
+// ───────────────────────── Operations: purchasing, stores, assets, budgets, facility booking, visitors and
+//                            hostel out-passes, health centre ─────────────────────────
+
+// ── Budgets ──
+
+enum BudgetStatus {
+  DRAFT
+  APPROVED
+}
+
+/// A department's (or the institution's) budget for a financial year, line by ledger account.
+model Budget {
+  id           String       @id @default(cuid())
+  fiscalYear   String // "2026-27": 1 April 2026 to 31 March 2027
+  departmentId String?
+  status       BudgetStatus @default(DRAFT)
+  notes        String?
+  createdById  String
+  approvedById String?
+  approvedAt   DateTime?
+  createdAt    DateTime     @default(now())
+  department   Department?  @relation(fields: [departmentId], references: [id])
+  lines        BudgetLine[]
+
+  @@unique([fiscalYear, departmentId])
+}
+
+model BudgetLine {
+  id        String        @id @default(cuid())
+  budgetId  String
+  accountId String
+  amount    Decimal       @db.Decimal(14, 2)
+  note      String?
+  budget    Budget        @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  account   LedgerAccount @relation(fields: [accountId], references: [id])
+  requests  PurchaseRequest[]
+
+  @@unique([budgetId, accountId])
+}
+
+// ── Purchasing ──
+
+model Vendor {
+  id          String          @id @default(cuid())
+  name        String          @unique
+  gstin       String?
+  contactName String?
+  phone       String?
+  email       String?
+  address     String?
+  categories  String[]
+  active      Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  orders      PurchaseOrder[]
+  invoices    VendorInvoice[]
+}
+
+enum PurchaseKind {
+  STOCK
+  ASSET
+  SERVICE
+}
+
+enum PurchaseRequestStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  REJECTED
+  ORDERED
+  CANCELLED
+}
+
+model PurchaseRequest {
+  id            String                @id @default(cuid())
+  number        String                @unique
+  departmentId  String
+  requestedById String
+  title         String
+  justification String
+  budgetLineId  String?
+  status        PurchaseRequestStatus @default(DRAFT)
+  total         Decimal               @db.Decimal(14, 2)
+  workflowId    String?               @unique
+  createdAt     DateTime              @default(now())
+  department    Department            @relation(fields: [departmentId], references: [id])
+  budgetLine    BudgetLine?           @relation(fields: [budgetLineId], references: [id])
+  lines         PurchaseRequestLine[]
+  orders        PurchaseOrder[]
+
+  @@index([status, createdAt])
+}
+
+model PurchaseRequestLine {
+  id           String          @id @default(cuid())
+  requestId    String
+  kind         PurchaseKind
+  description  String
+  itemId       String?
+  quantity     Float
+  unit         String
+  estUnitPrice Decimal         @db.Decimal(14, 2)
+  request      PurchaseRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  item         StockItem?      @relation(fields: [itemId], references: [id])
+}
+
+enum PurchaseOrderStatus {
+  ISSUED
+  PART_RECEIVED
+  RECEIVED
+  CLOSED
+  CANCELLED
+}
+
+model PurchaseOrder {
+  id          String              @id @default(cuid())
+  number      String              @unique
+  requestId   String?
+  vendorId    String
+  departmentId String
+  status      PurchaseOrderStatus @default(ISSUED)
+  orderDate   DateTime            @default(now())
+  expectedOn  DateTime?           @db.Date
+  taxPercent  Float               @default(0)
+  total       Decimal             @db.Decimal(14, 2)
+  terms       String?
+  createdById String
+  createdAt   DateTime            @default(now())
+  request     PurchaseRequest?    @relation(fields: [requestId], references: [id])
+  vendor      Vendor              @relation(fields: [vendorId], references: [id])
+  department  Department          @relation(fields: [departmentId], references: [id])
+  lines       PurchaseOrderLine[]
+  receipts    GoodsReceipt[]
+  invoices    VendorInvoice[]
+
+  @@index([status])
+}
+
+model PurchaseOrderLine {
+  id          String        @id @default(cuid())
+  poId        String
+  kind        PurchaseKind
+  description String
+  itemId      String?
+  quantity    Float
+  unit        String
+  unitPrice   Decimal       @db.Decimal(14, 2)
+  receivedQty Float         @default(0)
+  po          PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+  item        StockItem?    @relation(fields: [itemId], references: [id])
+  receiptLines GoodsReceiptLine[]
+}
+
+model GoodsReceipt {
+  id           String             @id @default(cuid())
+  number       String             @unique
+  poId         String
+  storeId      String?
+  receivedById String
+  receivedAt   DateTime           @default(now())
+  notes        String?
+  po           PurchaseOrder      @relation(fields: [poId], references: [id])
+  store        Store?             @relation(fields: [storeId], references: [id])
+  lines        GoodsReceiptLine[]
+}
+
+model GoodsReceiptLine {
+  id        String            @id @default(cuid())
+  receiptId String
+  poLineId  String
+  quantity  Float
+  receipt   GoodsReceipt      @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  poLine    PurchaseOrderLine @relation(fields: [poLineId], references: [id])
+}
+
+enum VendorInvoiceStatus {
+  RECEIVED
+  APPROVED
+  PAID
+  REJECTED
+}
+
+/// A vendor's bill against a purchase order. Approval posts it to the ledger; payment settles it.
+model VendorInvoice {
+  id          String              @id @default(cuid())
+  poId        String
+  vendorId    String
+  invoiceNo   String
+  invoiceDate DateTime            @db.Date
+  amount      Decimal             @db.Decimal(14, 2)
+  status      VendorInvoiceStatus @default(RECEIVED)
+  approvedById String?
+  approvedAt  DateTime?
+  paidAt      DateTime?
+  paymentRef  String?
+  createdAt   DateTime            @default(now())
+  po          PurchaseOrder       @relation(fields: [poId], references: [id])
+  vendor      Vendor              @relation(fields: [vendorId], references: [id])
+
+  @@unique([vendorId, invoiceNo])
+}
+
+// ── Stores and inventory ──
+
+model Store {
+  id        String          @id @default(cuid())
+  name      String          @unique
+  location  String?
+  keeperId  String?
+  createdAt DateTime        @default(now())
+  movements StockMovement[]
+  receipts  GoodsReceipt[]
+}
+
+model StockItem {
+  id           String          @id @default(cuid())
+  code         String          @unique
+  name         String
+  unit         String
+  category     String
+  reorderLevel Float           @default(0)
+  active       Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  movements    StockMovement[]
+  requestLines PurchaseRequestLine[]
+  orderLines   PurchaseOrderLine[]
+}
+
+enum MovementKind {
+  RECEIPT
+  ISSUE
+  ADJUSTMENT
+  TRANSFER_IN
+  TRANSFER_OUT
+}
+
+/// Stock ledger (append-only). Quantity is signed: receipts add, issues subtract. Unit cost is the
+/// weighted average at the time of an issue.
+model StockMovement {
+  id           String       @id @default(cuid())
+  itemId       String
+  storeId      String
+  kind         MovementKind
+  quantity     Float
+  unitCost     Decimal      @db.Decimal(14, 4)
+  departmentId String?
+  refType      String?
+  refId        String?
+  note         String?
+  createdById  String
+  createdAt    DateTime     @default(now())
+  item         StockItem    @relation(fields: [itemId], references: [id])
+  store        Store        @relation(fields: [storeId], references: [id])
+
+  @@index([itemId, storeId, createdAt])
+}
+
+// ── Fixed assets ──
+
+enum AssetStatus {
+  IN_USE
+  IN_REPAIR
+  IDLE
+  DISPOSED
+  LOST
+}
+
+enum DepreciationMethod {
+  STRAIGHT_LINE
+  WRITTEN_DOWN_VALUE
+}
+
+model Asset {
+  id               String             @id @default(cuid())
+  tag              String             @unique
+  name             String
+  category         String
+  departmentId     String
+  location         String?
+  custodianId      String?
+  purchaseDate     DateTime           @db.Date
+  cost             Decimal            @db.Decimal(14, 2)
+  salvageValue     Decimal            @default(0) @db.Decimal(14, 2)
+  usefulLifeYears  Float
+  method           DepreciationMethod @default(STRAIGHT_LINE)
+  /// Annual rate (%) for the written-down-value method
+  wdvRate          Float?
+  status           AssetStatus        @default(IN_USE)
+  poLineId         String?
+  serialNo         String?
+  disposedAt       DateTime?
+  disposalValue    Decimal?           @db.Decimal(14, 2)
+  createdAt        DateTime           @default(now())
+  department       Department         @relation(fields: [departmentId], references: [id])
+  events           AssetEvent[]
+
+  @@index([departmentId, status])
+}
+
+/// Asset history (append-only): transfers, repairs, physical verification, disposal.
+model AssetEvent {
+  id        String   @id @default(cuid())
+  assetId   String
+  kind      String
+  note      String?
+  actorId   String
+  createdAt DateTime @default(now())
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId, createdAt])
+}
+
+// ── Facility booking ──
+
+enum BookingRequestStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+model FacilityBooking {
+  id          String               @id @default(cuid())
+  roomId      String
+  title       String
+  purpose     String?
+  bookedById  String
+  startsAt    DateTime
+  endsAt      DateTime
+  attendees   Int?
+  status      BookingRequestStatus @default(REQUESTED)
+  decidedById String?
+  decidedAt   DateTime?
+  decisionNote String?
+  createdAt   DateTime             @default(now())
+  room        Room                 @relation(fields: [roomId], references: [id])
+
+  @@index([roomId, startsAt])
+  @@index([status])
+}
+
+// ── Gate: visitors and hostel out-passes ──
+
+model Visitor {
+  id           String    @id @default(cuid())
+  name         String
+  phone        String
+  purpose      String
+  hostUserId   String?
+  hostName     String?
+  vehicleNo    String?
+  idProof      String?
+  /// Pre-registered visitors get a pass code the host shares with them
+  passCode     String?   @unique
+  expectedAt   DateTime?
+  checkedInAt  DateTime?
+  checkedOutAt DateTime?
+  createdById  String
+  createdAt    DateTime  @default(now())
+
+  @@index([checkedInAt])
+  @@index([expectedAt])
+}
+
+enum OutpassStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  OUT
+  RETURNED
+  CANCELLED
+}
+
+model Outpass {
+  id               String        @id @default(cuid())
+  studentId        String
+  reason           String
+  destination      String
+  leaveAt          DateTime
+  returnBy         DateTime
+  status           OutpassStatus @default(REQUESTED)
+  decidedById      String?
+  decidedAt        DateTime?
+  decisionNote     String?
+  guardianNotified Boolean       @default(false)
+  outAt            DateTime?
+  inAt             DateTime?
+  late             Boolean       @default(false)
+  createdAt        DateTime      @default(now())
+  student          Student       @relation(fields: [studentId], references: [id])
+
+  @@index([status, leaveAt])
+  @@index([studentId])
+}
+
+// ── Health centre ──
+
+/// A visit to the health centre. Clinical details are visible to health-centre staff only; the patient
+/// sees the summary, any rest advised and the medical certificate.
+model ClinicVisit {
+  id            String    @id @default(cuid())
+  studentId     String?
+  employeeId    String?
+  visitedAt     DateTime  @default(now())
+  complaint     String
+  vitals        Json?
+  diagnosis     String?
+  treatment     String?
+  prescription  String?
+  referral      String?
+  restDays      Int       @default(0)
+  certificate   Boolean   @default(false)
+  attendedById  String
+  createdAt     DateTime  @default(now())
+  student       Student?  @relation(fields: [studentId], references: [id])
+  employee      Employee? @relation(fields: [employeeId], references: [id])
+
+  @@index([studentId, visitedAt])
+  @@index([employeeId, visitedAt])
+}

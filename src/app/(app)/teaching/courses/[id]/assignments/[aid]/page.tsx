@@ -15,6 +15,10 @@ import { getInstitution } from "@/server/services/directory";
 import { courseSpace } from "@/server/services/lms";
 import { signedAssetUrl } from "@/server/storage";
 import { aiStatus } from "@/server/ai/gateway";
+import { checkSimilarityAction } from "@/features/teaching/actions";
+import { latestSimilarity } from "@/server/services/submission-similarity";
+import { DataTable, Td } from "@/components/app/list";
+import { ScanSearch } from "lucide-react";
 
 export const metadata: Metadata = { title: "Assignment" };
 
@@ -36,6 +40,7 @@ export default async function TeacherAssignmentPage({ params, searchParams }: { 
     db.submission.findMany({ where: { assignmentId: aid }, orderBy: [{ attempt: "desc" }], include: { files: { include: { file: { select: { id: true, originalName: true, size: true } } } } } }),
     db.courseModule.findMany({ where: { offeringId: id }, select: { id: true, title: true } }),
   ]);
+  const similarity = await latestSimilarity(aid);
   const latest = new Map<string, (typeof subs)[number]>();
   for (const x of subs) if (!latest.has(x.studentId)) latest.set(x.studentId, x);
   const rows = regs.filter((r) => show === "all" || (show === "missing" ? !latest.has(r.student.id) : latest.has(r.student.id)));
@@ -59,6 +64,29 @@ export default async function TeacherAssignmentPage({ params, searchParams }: { 
         <p className="whitespace-pre-wrap text-sm">{a.instructions}</p>
         <KeyValue className="mt-4" items={[["Maximum marks", String(a.maxMarks)], ["Late work", a.closesAt ? `until ${fmtDateTimeZoned(a.closesAt, tz)}, −${a.latePenaltyPercent}%` : "not accepted"], ["Attempts", String(a.maxAttempts)], ["Answer", [a.allowText && "typed", a.allowFiles && `up to ${a.maxFiles} file(s)`].filter(Boolean).join(" and ")]]} />
       </Section>
+      {latest.size >= 2 && (
+        <Section
+          title="Similarity check"
+          description={similarity ? `Checked ${fmtDateTimeZoned(similarity.report.computedAt, tz)} — pairs sharing at least ${similarity.report.threshold}% of their wording. A high score is a reason to look, not proof of copying.` : "Compare the text of every submission with every other one (typed answers, text files, Word documents and PDFs with a text layer)."}
+          actions={<ActionButton label={similarity ? "Check again" : "Check similarity"} icon={<ScanSearch />} run={checkSimilarityAction.bind(null, aid)} />}
+          bodyClassName={similarity ? "p-0" : undefined}
+        >
+          {similarity ? (
+            <>
+              <DataTable head={[{ label: "Submissions" }, { label: "Overlap" }, { label: "Shared wording (sample)" }]} empty="No pair reaches the threshold.">
+                {similarity.pairs.map((p, i) => (
+                  <tr key={i}>
+                    <Td className="text-sm">{p.a}<br />{p.b}</Td>
+                    <Td className={p.score >= 60 ? "font-semibold text-tone-danger" : "font-medium text-tone-warning"}>{p.score}%</Td>
+                    <Td className="text-xs text-muted-foreground">{p.sample ? `“…${p.sample}…”` : "—"}</Td>
+                  </tr>
+                ))}
+              </DataTable>
+              {similarity.unreadable.length > 0 && <p className="px-5 py-3 text-xs text-muted-foreground">No readable text (scanned or image files): {similarity.unreadable.map((u) => u.who).join(", ")}.</p>}
+            </>
+          ) : <p className="text-sm text-muted-foreground">Not checked yet.</p>}
+        </Section>
+      )}
       <nav className="flex gap-3 text-sm" aria-label="Filter">
         {[["latest", "Submitted"], ["missing", "Not submitted"], ["all", "Everyone"]].map(([k, l]) => <a key={k} href={`?show=${k}`} className={show === k ? "font-medium text-primary" : "text-muted-foreground hover:text-foreground"}>{l}</a>)}
       </nav>

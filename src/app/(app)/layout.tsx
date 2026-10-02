@@ -1,4 +1,6 @@
+import { I18nProvider } from "@/components/i18n";
 import { AppShell } from "@/components/shell/app-shell";
+import { dictionary, translate } from "@/lib/i18n";
 import type { PaletteCommand } from "@/components/shell/command-palette";
 import { NAV, type NavGroup } from "@/components/shell/nav";
 import { can, canAny, requirePageAuth, isSuperAdmin } from "@/server/auth/current";
@@ -8,6 +10,9 @@ import { ShieldAlert } from "lucide-react";
 import { mfaRequiredButMissing, paperWhere } from "@/server/auth/access";
 import { db } from "@/server/db";
 import { demoModeEnabled } from "@/server/env";
+import { RichContent } from "@/components/app/rich-content";
+import { ConsentButtons } from "@/features/compliance/controls";
+import { pendingRequiredNotices } from "@/server/services/privacy";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requirePageAuth();
@@ -26,12 +31,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   ]);
   const counts = { inbox, moderation, scrutiny, approvals, assignments };
   const needsMfa = await mfaRequiredButMissing(ctx);
+  // DPDP: required privacy notices must be acknowledged before anything else.
+  const pendingNotices = await pendingRequiredNotices(ctx);
 
+  const t = (x: string) => translate(ctx.user.locale, x);
   const nav: NavGroup[] = NAV.map((g) => ({
     ...g,
+    label: t(g.label),
     items: g.items
       .filter((i) => (!i.audience || (i.audience === "staff") === (ctx.user.userType === "STAFF")) && (!i.any || canAny(ctx, i.any)) && (!i.employee || !!ctx.subject.employeeId) && (!i.superAdmin || isSuperAdmin(ctx)))
-      .map((i) => ({ ...i, count: i.badgeKey ? counts[i.badgeKey] : undefined })),
+      .map((i) => ({ ...i, label: t(i.label), count: i.badgeKey ? counts[i.badgeKey] : undefined })),
   })).filter((g) => g.items.length > 0);
 
   const commands: PaletteCommand[] = [];
@@ -46,6 +55,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   commands.push({ group: "Go to", label: "Out of office (delegate approvals)", href: "/inbox/delegations" });
 
   return (
+    <I18nProvider dict={dictionary(ctx.user.locale)}>
     <AppShell
       user={{
         name: ctx.user.name,
@@ -59,6 +69,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       unread={unread}
       commands={commands}
       demoMode={demoModeEnabled}
+      locale={ctx.user.locale}
       initialCollapsed={(await cookies()).get("ec_sidebar")?.value === "collapsed"}
     >
       {needsMfa && (
@@ -68,7 +79,23 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <Link href="/profile#security" className="font-semibold text-primary hover:underline">Set up now</Link>
         </div>
       )}
-      {children}
+      {pendingNotices.length ? (
+        <section aria-labelledby="consent-title" className="mx-auto max-w-3xl space-y-4">
+          <h1 id="consent-title" className="text-2xl font-semibold">Before you continue</h1>
+          <p className="text-sm text-muted-foreground">Please read how the institution uses your personal data. You can see these notices again, and make or change optional choices, under Privacy &amp; consent.</p>
+          {pendingNotices.map((n) => (
+            <article key={n.id} className="surface-card space-y-3 p-5">
+              <h2 className="font-semibold">{n.title} <span className="text-xs font-normal text-muted-foreground">v{n.version}</span></h2>
+              <p className="text-sm text-muted-foreground">{n.purpose}</p>
+              <div className="max-h-72 overflow-y-auto rounded-lg bg-muted/40 p-3 text-sm"><RichContent body={n.body} /></div>
+              <ConsentButtons noticeId={n.id} decision={null} required />
+            </article>
+          ))}
+        </section>
+      ) : (
+        children
+      )}
     </AppShell>
+    </I18nProvider>
   );
 }

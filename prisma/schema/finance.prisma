@@ -310,6 +310,7 @@ model LedgerAccount {
   parent    LedgerAccount?  @relation("AccountTree", fields: [parentId], references: [id])
   children  LedgerAccount[] @relation("AccountTree")
   lines     JournalLine[]
+  budgetLines BudgetLine[]
   feeHeads  FeeHead[]
   salaryComponents SalaryComponent[]
 }
@@ -338,6 +339,8 @@ model JournalLine {
   debit     Decimal       @default(0) @db.Decimal(14, 2)
   credit    Decimal       @default(0) @db.Decimal(14, 2)
   studentId String? // sub-ledger for receivables
+  /// Department the amount belongs to (budget actuals)
+  departmentId String?
   entry     JournalEntry  @relation(fields: [entryId], references: [id])
   account   LedgerAccount @relation(fields: [accountId], references: [id])
 

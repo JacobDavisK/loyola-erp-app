@@ -26,6 +26,8 @@ import { studentAttendance } from "@/server/services/attendance";
 import { degreeProgress } from "@/server/services/curriculum";
 
 import { StudentDocumentsTab } from "@/features/campus/student-documents-tab";
+import { NepPanel } from "@/features/compliance/nep-panel";
+import { SupportPanel } from "@/features/success/support-panel";
 
 export const metadata: Metadata = { title: "Student" };
 
@@ -66,6 +68,8 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
     { key: "guardians", label: "Guardians", count: s.guardians.length, href: `/students/${id}?tab=guardians` },
     { key: "academics", label: "Courses & attendance", href: `/students/${id}?tab=academics` },
     { key: "progress", label: "Degree progress", href: `/students/${id}?tab=progress` },
+    { key: "nep", label: "ABC & NEP", href: `/students/${id}?tab=nep` },
+    { key: "support", label: "Mentoring & support", href: `/students/${id}?tab=support` },
     ...(can(ctx, "result.view", s.departmentId) ? [{ key: "results", label: "Results", href: `/students/${id}?tab=results` }] : []),
     ...(can(ctx, "finance.view", s.departmentId) ? [{ key: "fees", label: "Fees", href: `/students/${id}?tab=fees` }] : []),
     { key: "credentials", label: "Certificates", href: `/students/${id}?tab=credentials` },
@@ -173,6 +177,8 @@ export default async function StudentPage({ params, searchParams }: { params: Pr
       {tab === "academics" && <AcademicsTab studentId={id} termId={term?.id ?? null} termName={term?.name ?? null} />}
       {tab === "progress" && <ProgressTab studentId={id} />}
       {tab === "results" && can(ctx, "result.view", s.departmentId) && <ResultsTab studentId={id} />}
+      {tab === "nep" && <NepPanel ctx={ctx} studentId={id} self={false} />}
+      {tab === "support" && <SupportPanel ctx={ctx} studentId={id} self={false} />}
       {tab === "documents" && <StudentDocumentsTab studentId={id} canUpload={canUpdate} canVerify={can(ctx, "document.verify", s.departmentId)} />}
       {tab === "credentials" && <CredentialsTab studentId={id} graduated={s.status === "GRADUATED"} />}
       {tab === "fees" && can(ctx, "finance.view", s.departmentId) && <FeesTab studentId={id} />}

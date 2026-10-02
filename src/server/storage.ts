@@ -83,6 +83,14 @@ export function detectMime(buf: Buffer, kind: FileKind, name = ""): string {
   if (kind === "COURSE_MATERIAL" || kind === "SUBMISSION" || kind === "EVIDENCE" || kind === "STUDENT_DOCUMENT") return detectDocument(buf, name);
   if (kind === "EXPORT") {
     if (PDF_SIGNATURE(buf)) return "application/pdf";
+    if (name.toLowerCase().endsWith(".json")) {
+      try {
+        JSON.parse(buf.toString("utf8"));
+        return "application/json";
+      } catch {
+        throw invalid("The export is not valid JSON.");
+      }
+    }
     throw invalid("Unsupported export format.");
   }
   if (kind === "PACKAGE") {

@@ -1,4 +1,5 @@
 import "server-only";
+import { isLocale, type Locale } from "@/lib/i18n";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 import { departmentsForScope, type OrgMap } from "@/lib/domain/org-scope";
@@ -31,6 +32,7 @@ export interface AuthContext {
     mfaEnabled: boolean;
     mustChangePassword: boolean;
     userType: "STAFF" | "STUDENT" | "GUARDIAN" | "EXTERNAL";
+    locale: Locale;
   };
   roles: RoleGrant[];
   primaryRole: RoleGrant;
@@ -116,6 +118,7 @@ export async function buildAuthContext(userId: string, sessionId: string): Promi
       name: user.name,
       email: user.email,
       employeeId: user.employeeId,
+      locale: isLocale(user.locale) ? user.locale : "en",
       designation: user.designation,
       departmentId: user.departmentId,
       departmentName: user.department?.name ?? null,

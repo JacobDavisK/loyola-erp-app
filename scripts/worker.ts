@@ -19,6 +19,13 @@ const PERIODIC: { type: string; everyMs: number }[] = [
   { type: "announcements.dispatch", everyMs: 5 * 60_000 },
   { type: "admissions.expireOffers", everyMs: 60 * 60_000 },
   { type: "library.reminders", everyMs: 24 * 3_600_000 },
+  { type: "privacy.retention", everyMs: 24 * 3_600_000 },
+  { type: "success.risk", everyMs: 12 * 3_600_000 },
+  { type: "proctoring.purge", everyMs: 24 * 3_600_000 },
+  { type: "messaging.dispatch", everyMs: 60_000 },
+  { type: "grievance.escalate", everyMs: 60 * 60_000 },
+  { type: "events.reminders", everyMs: 60 * 60_000 },
+  { type: "webhooks.deliver", everyMs: 30_000 },
 ];
 let stopping = false;
 

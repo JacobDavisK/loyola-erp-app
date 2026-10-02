@@ -9,19 +9,21 @@ import { requirePageAuth } from "@/server/auth/current";
 import { currentTerm } from "@/server/services/academic-setup";
 import { studentAttendance } from "@/server/services/attendance";
 import { portalSubject } from "@/server/services/portal";
+import { getT } from "@/server/i18n";
 
 export const metadata: Metadata = { title: "Attendance" };
 
 export default async function PortalAttendancePage({ searchParams }: { searchParams: Promise<{ student?: string }> }) {
   const ctx = await requirePageAuth("self.portal");
+  const t = await getT();
   const sp = await searchParams;
   const subject = await portalSubject(ctx, sp.student);
   const term = await currentTerm();
-  if (!subject.canAcademic || !term) return <div><PageHeader title="Attendance" /><EmptyState icon={Percent} title={term ? "Not shared with this account" : "No current term"} /></div>;
+  if (!subject.canAcademic || !term) return <div><PageHeader title={t("Attendance")} /><EmptyState icon={Percent} title={term ? "Not shared with this account" : "No current term"} /></div>;
   const att = await studentAttendance(ctx, subject.student.id, term.id);
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      <PageHeader title="Attendance" description={`${subject.student.firstName} ${subject.student.lastName} · ${term.name} · minimum ${att.policy.minimumPercent}% to sit the examination${att.policy.condonationPercent < att.policy.minimumPercent ? ` (condonation possible from ${att.policy.condonationPercent}%)` : ""}`} />
+      <PageHeader title={t("Attendance")} description={`${subject.student.firstName} ${subject.student.lastName} · ${term.name} · minimum ${att.policy.minimumPercent}% to sit the examination${att.policy.condonationPercent < att.policy.minimumPercent ? ` (condonation possible from ${att.policy.condonationPercent}%)` : ""}`} />
       <Section title="By course" bodyClassName="p-0">
         {att.classes.length === 0 ? <p className="px-5 py-4 text-sm text-muted-foreground">No classes registered this term.</p> : (
           <DataTable head={[{ label: "Course" }, { label: "Attended" }, { label: "%", className: "text-right" }, { label: "What it means" }]}>

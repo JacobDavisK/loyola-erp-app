@@ -1,0 +1,104 @@
+// ───────────────────────── Integrations: single sign-on, API, webhooks, calendar feeds ─────────────────────────
+
+enum SsoProviderKind {
+  GOOGLE
+  MICROSOFT
+}
+
+/// A configured identity provider. The client secret is encrypted with the data key.
+model SsoProvider {
+  id              String          @id @default(cuid())
+  kind            SsoProviderKind @unique
+  enabled         Boolean         @default(false)
+  clientId        String
+  clientSecretEnc String
+  /// Microsoft: directory (tenant) id, or "organizations"
+  tenant          String?
+  /// Only accounts whose e-mail ends with one of these domains may sign in (empty = any existing account)
+  allowedDomains  String[]
+  updatedById     String
+  updatedAt       DateTime        @updatedAt
+}
+
+/// A link between a user and an outside identity (provider + stable subject id).
+model UserIdentity {
+  id         String          @id @default(cuid())
+  userId     String
+  provider   SsoProviderKind
+  subject    String
+  email      String
+  createdAt  DateTime        @default(now())
+  lastUsedAt DateTime?
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, subject])
+  @@index([userId])
+}
+
+/// A personal access token for the REST API and the AI connector. Only a hash is stored.
+model ApiToken {
+  id         String    @id @default(cuid())
+  userId     String
+  name       String
+  /// First characters, shown so people can tell tokens apart
+  prefix     String
+  tokenHash  String    @unique
+  scopes     String[]
+  expiresAt  DateTime?
+  lastUsedAt DateTime?
+  lastUsedIp String?
+  revokedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// An outside system notified when things happen in the ERP. Deliveries are signed with the secret.
+model WebhookEndpoint {
+  id           String            @id @default(cuid())
+  name         String
+  url          String
+  secretEnc    String
+  /// Event prefixes subscribed to, e.g. "payment." or "student.create"
+  events       String[]
+  active       Boolean           @default(true)
+  createdById  String
+  createdAt    DateTime          @default(now())
+  failingSince DateTime?
+  deliveries   WebhookDelivery[]
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+  GAVE_UP
+}
+
+model WebhookDelivery {
+  id             String                @id @default(cuid())
+  endpointId     String
+  event          String
+  payload        Json
+  status         WebhookDeliveryStatus @default(PENDING)
+  attempts       Int                   @default(0)
+  nextAttemptAt  DateTime              @default(now())
+  responseStatus Int?
+  error          String?
+  createdAt      DateTime              @default(now())
+  deliveredAt    DateTime?
+  endpoint       WebhookEndpoint       @relation(fields: [endpointId], references: [id], onDelete: Cascade)
+
+  @@index([status, nextAttemptAt])
+  @@index([endpointId, createdAt])
+}
+
+/// A private calendar subscription (ICS) for a person's timetable, exams, events and deadlines.
+model CalendarFeed {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  tokenHash String   @unique
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}

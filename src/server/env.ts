@@ -22,6 +22,20 @@ const schema = z.object({
   ANTHROPIC_API_KEY: z.string().optional(),
   AI_MODEL: z.string().default("claude-sonnet-5"),
   AI_BASE_URL: z.string().url().default("https://api.anthropic.com"),
+  /** SMS / WhatsApp delivery. "outbox" records messages without sending (development). */
+  SMS_DRIVER: z.enum(["outbox", "twilio"]).default("outbox"),
+  TWILIO_ACCOUNT_SID: z.string().optional(),
+  TWILIO_AUTH_TOKEN: z.string().optional(),
+  TWILIO_FROM: z.string().optional(),
+  WHATSAPP_DRIVER: z.enum(["outbox", "meta"]).default("outbox"),
+  WHATSAPP_TOKEN: z.string().optional(),
+  WHATSAPP_PHONE_ID: z.string().optional(),
+  WHATSAPP_APP_SECRET: z.string().optional(),
+  WHATSAPP_VERIFY_TOKEN: z.string().optional(),
+  /** Approved WhatsApp template for alerts, with one body parameter */
+  WHATSAPP_TEMPLATE: z.string().default("erp_alert"),
+  /** Contact address shown to push services (VAPID subject) */
+  PUSH_CONTACT: z.string().default("mailto:it@example.edu"),
 });
 
 const parsed = schema.safeParse(process.env);

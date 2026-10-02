@@ -7,6 +7,7 @@ enum LearningItemKind {
   FILE
   LINK
   VIDEO
+  LTI
 }
 
 enum SubmissionStatus {
@@ -60,6 +61,8 @@ model LearningItem {
   body          String?
   url           String?
   fileId        String?
+  /// For LTI items: the tool placement to launch
+  ltiLinkId     String?
   order         Int              @default(0)
   isPublished   Boolean          @default(false)
   availableFrom DateTime?
@@ -69,6 +72,7 @@ model LearningItem {
   module        CourseModule     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   file          FileAsset?       @relation(fields: [fileId], references: [id])
   views         LearningItemView[]
+  outcomes      LearningItemOutcome[]
 
   @@index([moduleId, order])
 }
@@ -125,6 +129,7 @@ model Assignment {
   module             CourseModule?  @relation(fields: [moduleId], references: [id], onDelete: SetNull)
   submissions        Submission[]
 
+  similarityReports SimilarityReport[]
   @@index([offeringId, dueAt])
 }
 
@@ -175,6 +180,7 @@ model Quiz {
   maxAttempts      Int              @default(1)
   shuffleQuestions Boolean          @default(false)
   reviewPolicy     QuizReviewPolicy @default(AFTER_CLOSE)
+  proctoring       ProctoringMode   @default(NONE)
   isPublished      Boolean          @default(false)
   createdById      String
   createdAt        DateTime         @default(now())
@@ -199,7 +205,10 @@ model QuizQuestion {
   answer      Json
   marks       Float
   explanation String?
+  /// Course outcome the question assesses (optional; drives learning recommendations)
+  outcomeId   String?
   quiz        Quiz             @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  outcome     LearningOutcome? @relation(fields: [outcomeId], references: [id], onDelete: SetNull)
 
   @@index([quizId, order])
 }
@@ -220,7 +229,10 @@ model QuizAttempt {
   marksAwarded  Json?
   score         Float?
   maxScore      Float
+  /// When the student accepted the proctoring notice (proctored quizzes only)
+  proctorConsentAt DateTime?
   quiz          Quiz              @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  proctorEvents ProctorEvent[]
   student       Student           @relation(fields: [studentId], references: [id])
 
   @@unique([quizId, studentId, attemptNo])

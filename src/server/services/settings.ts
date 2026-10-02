@@ -88,6 +88,7 @@ export const SETTING_SCHEMAS = {
     reportAssistant: z.boolean(),
     feedbackDrafts: z.boolean(),
     announcementDrafts: z.boolean(),
+    studentAssistant: z.boolean().default(true),
     dailyRequestsPerUser: z.number().int().min(1).max(1000),
   }),
   hr: z.object({
@@ -106,6 +107,68 @@ export const SETTING_SCHEMAS = {
       rebateMax: z.number().min(0),
       cessPercent: z.number().min(0).max(100),
     }),
+  }),
+  obe: z.object({
+    targetPercent: z.number().min(1).max(100),
+    levelThresholds: z.tuple([z.number().min(0).max(100), z.number().min(0).max(100), z.number().min(0).max(100)]).refine((t) => t[0] <= t[1] && t[1] <= t[2], { message: "Thresholds must increase" }),
+    internalWeight: z.number().min(0).max(100),
+    indirectWeight: z.number().min(0).max(100),
+    /** Attainment (0–3) a programme outcome should reach */
+    poTarget: z.number().min(0).max(3),
+  }),
+  nep: z.object({
+    /** Highest share of programme credits that may come from SWAYAM / MOOCs / other institutions */
+    externalCreditMaxPercent: z.number().min(0).max(100),
+    nadIssuerName: z.string().max(200),
+  }),
+  success: z.object({
+    weights: z.object({ attendance: z.number().min(0).max(100), marks: z.number().min(0).max(100), failures: z.number().min(0).max(100), fees: z.number().min(0).max(100), engagement: z.number().min(0).max(100) }),
+    mediumAt: z.number().min(1).max(100),
+    highAt: z.number().min(1).max(100),
+    attendanceFloor: z.number().min(0).max(100),
+    marksComfort: z.number().min(25).max(100),
+    inactivityDays: z.number().int().min(1).max(90),
+    /** Open a support case automatically when a student's level turns high */
+    autoOpenCases: z.boolean(),
+    caseSlaDays: z.number().int().min(1).max(60),
+  }).refine((v) => v.mediumAt < v.highAt, { path: ["highAt"], message: "High must be above medium" }),
+  timetable: z.object({
+    /** ISO weekdays with classes */
+    days: z.array(z.number().int().min(1).max(7)).min(1),
+    /** Bell schedule: [start, end] per period, HH:MM */
+    periods: z.array(z.tuple([z.string().regex(/^\d{2}:\d{2}$/), z.string().regex(/^\d{2}:\d{2}$/)])).min(1).max(14),
+    maxInstructorPeriodsPerDay: z.number().int().min(1).max(14),
+  }),
+  proctoring: z.object({
+    /** Minutes between webcam frames in webcam-proctored quizzes */
+    webcamIntervalMinutes: z.number().int().min(1).max(30),
+    /** Integrity events above which an attempt is flagged for review */
+    flagThreshold: z.number().int().min(1).max(100),
+    /** Days to keep webcam frames */
+    retainDays: z.number().int().min(1).max(365),
+  }),
+  campus: z.object({
+    /** Days each grievance level has to respond (UGC: 15 days) */
+    grievanceDays: z.number().int().min(1).max(60),
+    ombudspersonDays: z.number().int().min(1).max(90),
+    /** Days after a resolution within which the student may appeal */
+    appealDays: z.number().int().min(1).max(60),
+    /** Notification types also sent by SMS / WhatsApp to people who opted in */
+    importantTypes: z.array(z.string().max(60)).max(50),
+  }),
+  operations: z.object({
+    /** Room types that need approval to book (others are confirmed at once when free) */
+    approvalRoomTypes: z.array(z.enum(["CLASSROOM", "LAB", "SEMINAR_HALL", "EXAM_HALL", "AUDITORIUM", "OTHER"])),
+    assetTagPrefix: z.string().max(20),
+  }),
+  privacy: z.object({
+    /** Days to respond to a data-principal request */
+    requestDays: z.number().int().min(1).max(90),
+    /** Hours within which a personal-data breach must be reported to the Data Protection Board */
+    breachNotifyHours: z.number().int().min(1).max(720),
+    dpoName: z.string().max(120),
+    dpoEmail: z.string().max(200),
+    adultAge: z.number().int().min(16).max(21),
   }),
 } as const;
 
@@ -168,7 +231,7 @@ export const SETTING_DEFAULTS: { [K in SettingKey]: SettingValue<K> } = {
   },
   admissions: { applicationPrefix: "APP{YY}-", weightQualifying: 60, weightEntrance: 40 },
   placements: { oneOfferPolicy: true },
-  ai: { enabled: true, reportAssistant: true, feedbackDrafts: true, announcementDrafts: true, dailyRequestsPerUser: 50 },
+  ai: { enabled: true, reportAssistant: true, feedbackDrafts: true, announcementDrafts: true, studentAssistant: true, dailyRequestsPerUser: 50 },
   hr: {
     employeePrefix: "EMP{YY}",
     workWeek: [1, 2, 3, 4, 5, 6],
@@ -196,6 +259,14 @@ export const SETTING_DEFAULTS: { [K in SettingKey]: SettingValue<K> } = {
     retotallingFee: 200,
     revaluationMinChange: 2,
   },
+  obe: { targetPercent: 60, levelThresholds: [40, 55, 70], internalWeight: 40, indirectWeight: 20, poTarget: 2 },
+  nep: { externalCreditMaxPercent: 40, nadIssuerName: "" },
+  success: { weights: { attendance: 30, marks: 30, failures: 20, fees: 10, engagement: 10 }, mediumAt: 35, highAt: 60, attendanceFloor: 75, marksComfort: 60, inactivityDays: 14, autoOpenCases: true, caseSlaDays: 7 },
+  timetable: { days: [1, 2, 3, 4, 5, 6], periods: [["09:00", "09:50"], ["09:50", "10:40"], ["11:00", "11:50"], ["11:50", "12:40"], ["13:30", "14:20"], ["14:20", "15:10"], ["15:10", "16:00"]], maxInstructorPeriodsPerDay: 5 },
+  proctoring: { webcamIntervalMinutes: 3, flagThreshold: 5, retainDays: 90 },
+  campus: { grievanceDays: 15, ombudspersonDays: 30, appealDays: 15, importantTypes: ["invoice.issued", "payment.received", "result.published", "revaluation.completed", "library.due", "placement.update", "counselling.booked", "grievance.update", "event.reminder", "convocation.update"] },
+  operations: { approvalRoomTypes: ["SEMINAR_HALL", "AUDITORIUM", "EXAM_HALL"], assetTagPrefix: "AST/{YYYY}/" },
+  privacy: { requestDays: 30, breachNotifyHours: 72, dpoName: "Data Protection Officer", dpoEmail: "dpo@example.edu", adultAge: 18 },
 };
 
 async function load<K extends SettingKey>(key: K): Promise<SettingValue<K>> {

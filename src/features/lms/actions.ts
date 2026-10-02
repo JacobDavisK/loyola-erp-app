@@ -73,8 +73,8 @@ export async function saveQuestionAction(quizId: string, id: string | null, inpu
 export async function deleteQuestionAction(id: string) {
   return runAction(async () => { await deleteQuestion(await requireAuth(), id); refresh(); }, "Question deleted");
 }
-export async function startAttemptAction(quizId: string) {
-  return runAction(async () => { const a = await startAttempt(await requireAuth(), quizId); refresh(); return { id: a.id }; });
+export async function startAttemptAction(quizId: string, proctorConsent = false) {
+  return runAction(async () => { const a = await startAttempt(await requireAuth(), quizId, { proctorConsent }); refresh(); return { id: a.id }; });
 }
 export async function saveAnswersAction(attemptId: string, answers: unknown) {
   return runAction(async () => { await saveAnswers(await requireAuth(), attemptId, answers); });

@@ -40,7 +40,7 @@ export async function courseSpace(ctx: AuthContext, offeringId: string) {
   return { offering: o, role, studentId };
 }
 
-async function teacherOf(ctx: AuthContext, offeringId: string) {
+export async function teacherOf(ctx: AuthContext, offeringId: string) {
   const s = await courseSpace(ctx, offeringId);
   if (s.role !== "teacher") throw forbidden("Only the class's instructors can change the course space.");
   return s;
@@ -315,6 +315,7 @@ export const quizSchema = z.object({
   maxAttempts: z.number().int().min(1).max(20).default(1),
   shuffleQuestions: z.boolean().default(false),
   reviewPolicy: z.enum(["AFTER_SUBMIT", "AFTER_CLOSE", "SCORE_ONLY", "NEVER"]).default("AFTER_CLOSE"),
+  proctoring: z.enum(["NONE", "BASIC", "WEBCAM"]).default("NONE"),
   isPublished: z.boolean().default(false),
 }).refine((v) => v.closesAt > v.opensAt, { path: ["closesAt"], message: "Closing time must be after opening" });
 
@@ -342,6 +343,8 @@ export const questionSchema = z.object({
   marks: z.number().positive().max(100),
   explanation: z.string().trim().max(2000).nullable().optional(),
   order: z.number().int().min(0).max(500).default(0),
+  /** Course outcome the question assesses */
+  outcomeId: z.string().nullable().optional(),
 });
 
 /** Validate a question's options and answer key together. */
@@ -371,7 +374,11 @@ export async function saveQuestion(ctx: AuthContext, quizId: string, id: string 
   const quiz = await quizForTeacher(ctx, quizId);
   if (quiz._count.attempts) throw conflict("Students have attempted this quiz; its questions are locked. Create a new quiz instead.");
   const v = parseQuestion(raw);
-  const data = { type: v.type, prompt: v.prompt, options: (v.options ?? undefined) as Prisma.InputJsonValue | undefined, answer: v.answer as Prisma.InputJsonValue, marks: v.marks, explanation: v.explanation || null, order: v.order };
+  if (v.outcomeId) {
+    const o = await db.courseOffering.findUniqueOrThrow({ where: { id: quiz.offeringId }, select: { courseId: true } });
+    if (!(await db.learningOutcome.findFirst({ where: { id: v.outcomeId, courseId: o.courseId } }))) throw invalid("Choose an outcome of this course.");
+  }
+  const data = { type: v.type, prompt: v.prompt, options: (v.options ?? undefined) as Prisma.InputJsonValue | undefined, answer: v.answer as Prisma.InputJsonValue, marks: v.marks, explanation: v.explanation || null, order: v.order, outcomeId: v.outcomeId || null };
   const q = id ? await db.quizQuestion.update({ where: { id: (await db.quizQuestion.findFirstOrThrow({ where: { id, quizId } })).id }, data }) : await db.quizQuestion.create({ data: { ...data, quizId } });
   await audit({ ...actor(ctx), action: id ? "lms.question.update" : "lms.question.create", resourceType: "quiz", resourceId: quizId, summary: `${v.type}: ${v.prompt.slice(0, 80)}` });
   return q;
@@ -403,7 +410,7 @@ async function finalizeAttempt(attemptId: string, answers: Record<string, unknow
 }
 
 /** Start a new attempt, or resume the one in progress. */
-export async function startAttempt(ctx: AuthContext, quizId: string) {
+export async function startAttempt(ctx: AuthContext, quizId: string, opts: { proctorConsent?: boolean } = {}) {
   const quiz = await db.quiz.findUnique({ where: { id: quizId }, include: { questions: { select: { id: true, marks: true, order: true }, orderBy: { order: "asc" } } } });
   if (!quiz) throw notFound("Quiz");
   const s = await courseSpace(ctx, quiz.offeringId);
@@ -416,12 +423,14 @@ export async function startAttempt(ctx: AuthContext, quizId: string) {
   if (now >= quiz.closesAt) throw workflowError("The quiz has closed.");
   const count = await db.quizAttempt.count({ where: { quizId, studentId: s.studentId! } });
   if (count >= quiz.maxAttempts) throw workflowError(`You have used all ${quiz.maxAttempts} attempt(s).`);
+  if (quiz.proctoring !== "NONE" && !opts.proctorConsent) throw workflowError(quiz.proctoring === "WEBCAM" ? "This quiz is proctored with your webcam. Accept the proctoring notice to start." : "This quiz is proctored. Accept the proctoring notice to start.");
   const ids = quiz.questions.map((q) => q.id);
   const attemptNo = count + 1;
   const a = await db.quizAttempt.create({
     data: {
       quizId, studentId: s.studentId!, attemptNo, startedAt: now, deadlineAt: attemptDeadline(now, quiz.closesAt, quiz.timeLimitMinutes),
       questionOrder: quiz.shuffleQuestions ? seededShuffle(ids, `${quizId}:${s.studentId}:${attemptNo}`) : ids, maxScore: quiz.questions.reduce((x, q) => x + q.marks, 0),
+      proctorConsentAt: quiz.proctoring !== "NONE" ? now : null,
     },
   });
   await audit({ ...actor(ctx), action: "lms.quiz.start", resourceType: "quizAttempt", resourceId: a.id, summary: `${quiz.title}: attempt ${attemptNo}` });
@@ -466,27 +475,34 @@ export async function submitAttempt(ctx: AuthContext, attemptId: string, raw: un
 
 // ───────────────────────── Gradebook ─────────────────────────
 
-export interface GradebookColumn { key: string; kind: "assignment" | "quiz"; id: string; title: string; max: number }
+export interface GradebookColumn { key: string; kind: "assignment" | "quiz" | "tool"; id: string; title: string; max: number }
 
 /** Scores per student: an assignment's latest graded submission (after penalty), a quiz's best attempt. */
 export async function gradebook(ctx: AuthContext, offeringId: string) {
   const s = await courseSpace(ctx, offeringId);
   if (s.role === "student") throw forbidden();
   await finalizeExpiredAttempts({ quiz: { offeringId } });
-  const [regs, assignments, quizzes] = await Promise.all([
+  const [regs, assignments, quizzes, tools] = await Promise.all([
     db.courseRegistration.findMany({ where: { offeringId, status: { in: ["REGISTERED", "COMPLETED"] } }, include: { student: { select: { id: true, studentNo: true, firstName: true, lastName: true } } }, orderBy: { student: { studentNo: "asc" } } }),
     db.assignment.findMany({ where: { offeringId, isPublished: true }, orderBy: { dueAt: "asc" }, include: { submissions: { where: { status: "GRADED" }, orderBy: { attempt: "desc" }, select: { studentId: true, finalMarks: true } } } }),
     db.quiz.findMany({ where: { offeringId, isPublished: true }, orderBy: { opensAt: "asc" }, include: { attempts: { where: { status: "SUBMITTED" }, select: { studentId: true, score: true, maxScore: true } } } }),
+    db.ltiLink.findMany({ where: { offeringId, maxScore: { not: null } }, orderBy: { createdAt: "asc" }, include: { scores: { where: { gradingProgress: "FullyGraded", scoreGiven: { not: null } }, orderBy: { timestamp: "desc" } } } }),
   ]);
   const columns: GradebookColumn[] = [
     ...assignments.map((a) => ({ key: `a:${a.id}`, kind: "assignment" as const, id: a.id, title: a.title, max: a.maxMarks })),
     ...quizzes.map((q) => ({ key: `q:${q.id}`, kind: "quiz" as const, id: q.id, title: q.title, max: q.attempts[0]?.maxScore ?? 0 })),
+    ...tools.map((t) => ({ key: `l:${t.id}`, kind: "tool" as const, id: t.id, title: t.title, max: t.maxScore! })),
   ];
   const score = new Map<string, number>();
   for (const a of assignments) for (const sub of a.submissions) if (!score.has(`a:${a.id}:${sub.studentId}`) && sub.finalMarks !== null) score.set(`a:${a.id}:${sub.studentId}`, sub.finalMarks);
   for (const q of quizzes) for (const at of q.attempts) {
     const k = `q:${q.id}:${at.studentId}`;
     if (at.score !== null && (score.get(k) ?? -1) < at.score) score.set(k, at.score);
+  }
+  // External tools: the latest fully graded score, scaled to the placement's maximum.
+  for (const t of tools) for (const sc of t.scores) {
+    const k = `l:${t.id}:${sc.studentId}`;
+    if (!score.has(k)) score.set(k, Math.round((sc.scoreGiven! / sc.scoreMaximum) * t.maxScore! * 100) / 100);
   }
   for (const c of columns) if (c.kind === "quiz" && c.max === 0) c.max = (await db.quizQuestion.aggregate({ where: { quizId: c.id }, _sum: { marks: true } }))._sum.marks ?? 0;
   const rows = regs.map((r) => ({ student: r.student, cells: Object.fromEntries(columns.map((c) => [c.key, score.get(`${c.key}:${r.student.id}`) ?? null])) as Record<string, number | null> }));
@@ -500,7 +516,7 @@ export async function gradebook(ctx: AuthContext, offeringId: string) {
  */
 export async function transferToComponent(ctx: AuthContext, offeringId: string, raw: unknown) {
   await teacherOf(ctx, offeringId);
-  const v = z.object({ column: z.string().regex(/^[aq]:[a-z0-9]+$/i), componentId: z.string().min(1) }).parse(raw);
+  const v = z.object({ column: z.string().regex(/^[aql]:[a-z0-9]+$/i), componentId: z.string().min(1) }).parse(raw);
   const comp = await db.assessmentComponent.findFirst({ where: { id: v.componentId, offeringId } });
   if (!comp) throw invalid("Choose an assessment component of this class.");
   const gb = await gradebook(ctx, offeringId);

@@ -17,14 +17,16 @@ import { REQUESTABLE } from "@/server/services/credentials";
 import { portalSubject } from "@/server/services/portal";
 import { studentResults } from "@/server/services/results";
 import { getSetting } from "@/server/services/settings";
+import { getT } from "@/server/i18n";
 
 export const metadata: Metadata = { title: "Results" };
 
 export default async function PortalResultsPage({ searchParams }: { searchParams: Promise<{ student?: string }> }) {
   const ctx = await requirePageAuth("self.portal");
+  const t = await getT();
   const sp = await searchParams;
   const subject = await portalSubject(ctx, sp.student);
-  if (!subject.canAcademic) return <div><PageHeader title="Results" /><EmptyState icon={Award} title="Not shared with this account" /></div>;
+  if (!subject.canAcademic) return <div><PageHeader title={t("Results")} /><EmptyState icon={Award} title="Not shared with this account" /></div>;
   const s = subject.student;
   const [{ courses, terms, cgpa }, settings, credentials, pendingRequests] = await Promise.all([
     studentResults(ctx, s.id),

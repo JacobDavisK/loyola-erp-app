@@ -7,6 +7,7 @@ enum StudentStatus {
   WITHDRAWN
   DISCONTINUED
   GRADUATED
+  EXITED
 }
 
 enum Gender {
@@ -133,6 +134,10 @@ model Student {
   studentNo        String        @unique // institution-generated, e.g. 24BCA0007
   admissionNo      String        @unique
   registrationNo   String?       @unique // university registration number, when issued
+  /// APAAR ID: the 12-digit "One Nation One Student ID", also the Academic Bank of Credits account.
+  apaarId          String?       @unique
+  apaarVerifiedAt  DateTime?
+  apaarVerifiedById String?
   firstName        String
   lastName         String
   dateOfBirth      DateTime?     @db.Date
@@ -188,6 +193,24 @@ model Student {
   admissionApplication AdmissionApplication?
   placementApplications PlacementApplication[]
   alumniProfile    AlumniProfile?
+  exitRequests     ExitRequest[]
+  risks            StudentRisk[]
+  supportCases     SupportCase[]
+  mentors          MentorAssignment[]
+  mentorMeetings   MentorMeeting[]
+  planEntries      PlanEntry[]
+  checkIns         CheckIn[]
+  ltiScores        LtiScore[]
+  badgeAwards      BadgeAward[]
+  counsellingBookings CounsellingBooking[]
+  grievances       Grievance[]
+  antiRagging      AntiRaggingUndertaking[]
+  clubs            ClubMember[]
+  convocations     ConvocationGraduate[]
+  outpasses        Outpass[]
+  clinicVisits     ClinicVisit[]
+  verifiableCredentials VerifiableCredential[]
+  externalCredits  ExternalCredit[]
 
   @@index([departmentId, status])
   @@index([programId, batchId])
@@ -255,6 +278,9 @@ model AcademicTerm {
   examSessions         ExaminationSession[]
   resultRuns           ResultRun[]
   invoices             Invoice[]
+  nadBatches           NadBatch[]
+  risks                StudentRisk[]
+  timetableRuns        TimetableRun[]
 
   @@index([academicYearId])
 }
@@ -301,6 +327,7 @@ model Room {
   meetings     ClassMeeting[]
   examSeats    ExamSeat[]
   duties       InvigilationDuty[]
+  facilityBookings FacilityBooking[]
 }
 
 /// A course taught in a term, to one section.
@@ -327,6 +354,11 @@ model CourseOffering {
   announcements CourseAnnouncement[]
   assignments   Assignment[]
   quizzes       Quiz[]
+  ltiLinks      LtiLink[]
+  surveys       Survey[]
+  /// Weekly teaching load used by the timetable generator (defaults from the course credits and mode)
+  weeklyLectures Int?
+  weeklyLabs     Int?
 
   @@unique([courseId, termId, section])
   @@index([termId])
@@ -394,6 +426,7 @@ model ClassMeeting {
   offering   CourseOffering     @relation(fields: [offeringId], references: [id], onDelete: Cascade)
   room       Room?              @relation(fields: [roomId], references: [id])
   records    AttendanceRecord[]
+  checkIn    CheckInWindow?
 
   @@unique([offeringId, startsAt])
   @@index([date])

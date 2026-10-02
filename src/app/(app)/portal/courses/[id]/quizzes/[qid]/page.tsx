@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 import { requirePageAuth } from "@/server/auth/current";
 import { db } from "@/server/db";
 import { getInstitution } from "@/server/services/directory";
+import { getSetting } from "@/server/services/settings";
+import { ProctorGuard, StartProctoredQuiz } from "@/features/teaching/controls";
 import { courseSpace, finalizeExpiredAttempts } from "@/server/services/lms";
 
 export const metadata: Metadata = { title: "Quiz" };
@@ -45,10 +47,12 @@ export default async function StudentQuizPage({ params }: { params: Promise<{ id
   const vis = reviewVisibility(quiz.reviewPolicy, closed);
   const byId = new Map(quiz.questions.map((q) => [q.id, q]));
   const canStart = !open && now >= quiz.opensAt && !closed && quiz.attempts.length < quiz.maxAttempts;
+  const proctor = quiz.proctoring !== "NONE" ? await getSetting("proctoring") : null;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <PageHeader eyebrow={`${s.offering.course.code} · quiz`} title={quiz.title} breadcrumbs={[{ label: s.offering.course.code, href: `/portal/courses/${id}?tab=quizzes` }, { label: quiz.title }]} />
+      {open && proctor && quiz.proctoring !== "NONE" && <ProctorGuard attemptId={open.id} mode={quiz.proctoring} intervalMinutes={proctor.webcamIntervalMinutes} />}
       {open ? (
         // Only prompts and options are sent to the browser — never the answer key.
         <QuizTaker
@@ -62,7 +66,7 @@ export default async function StudentQuizPage({ params }: { params: Promise<{ id
           {quiz.instructions && <p className="mb-3 whitespace-pre-wrap text-sm">{quiz.instructions}</p>}
           <KeyValue items={[["Opens", fmtDateTimeZoned(quiz.opensAt, tz)], ["Closes", fmtDateTimeZoned(quiz.closesAt, tz)], ["Time limit", quiz.timeLimitMinutes ? `${quiz.timeLimitMinutes} minutes (the timer keeps running if you leave the page)` : "None"], ["Questions", `${quiz.questions.length} · ${quiz.questions.reduce((a, q) => a + q.marks, 0)} marks`], ["Attempts", `${quiz.attempts.length} of ${quiz.maxAttempts} used`], ["Review", POLICY[quiz.reviewPolicy]]]} />
           <div className="mt-4">
-            {canStart ? <StartQuizButton quizId={quiz.id} label={quiz.attempts.length ? "Start another attempt" : "Start quiz"} /> : <p className="text-sm text-muted-foreground">{now < quiz.opensAt ? "The quiz has not opened yet." : closed ? "The quiz has closed." : "You have used all your attempts."}</p>}
+            {canStart && quiz.proctoring !== "NONE" ? <StartProctoredQuiz quizId={quiz.id} mode={quiz.proctoring} label={quiz.attempts.length ? "Start another attempt" : "Start quiz"} /> : canStart ? <StartQuizButton quizId={quiz.id} label={quiz.attempts.length ? "Start another attempt" : "Start quiz"} /> : <p className="text-sm text-muted-foreground">{now < quiz.opensAt ? "The quiz has not opened yet." : closed ? "The quiz has closed." : "You have used all your attempts."}</p>}
           </div>
         </Section>
       )}

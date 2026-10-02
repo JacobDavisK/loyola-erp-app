@@ -6,3 +6,5 @@ import "./exam";
 import "./finance";
 import "./hr";
 import "./research";
+import "./student-exit";
+import "./procurement";

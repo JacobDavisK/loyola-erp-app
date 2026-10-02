@@ -15,14 +15,16 @@ import { can, requirePageAuth } from "@/server/auth/current";
 import { db } from "@/server/db";
 import { onlinePaymentsEnabled } from "@/server/payments/gateway";
 import { portalSubject } from "@/server/services/portal";
+import { getT } from "@/server/i18n";
 
 export const metadata: Metadata = { title: "Fees" };
 
 export default async function PortalFeesPage({ searchParams }: { searchParams: Promise<{ student?: string }> }) {
   const ctx = await requirePageAuth("self.portal");
+  const t = await getT();
   const sp = await searchParams;
   const subject = await portalSubject(ctx, sp.student);
-  if (!subject.canFinance) return <div><PageHeader title="Fees" /><EmptyState icon={Wallet} title="Fee information is not shared with this account" /></div>;
+  if (!subject.canFinance) return <div><PageHeader title={t("Fees")} /><EmptyState icon={Wallet} title="Fee information is not shared with this account" /></div>;
   const s = subject.student;
   const now = new Date();
   const [invoices, payments, schemes, apps, inst] = await Promise.all([
@@ -40,7 +42,7 @@ export default async function PortalFeesPage({ searchParams }: { searchParams: P
   const applied = new Set(apps.map((a) => a.schemeId));
   return (
     <div className="space-y-6">
-      <PageHeader title="Fees" description={`${s.firstName} ${s.lastName} · ${s.studentNo}`} />
+      <PageHeader title={t("Fees")} description={`${s.firstName} ${s.lastName} · ${s.studentNo}`} />
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(180px,1fr))]">
         <StatCard label="Outstanding" value={fmt(outstanding)} icon={Wallet} tone={overdue.length ? "danger" : outstanding ? "warning" : "success"} hint={overdue.length ? `${overdue.length} invoice(s) overdue` : outstanding ? `Next due ${fmtDate(open.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())[0]?.dueDate)}` : "Nothing due"} />
         <StatCard label="Paid this year" value={fmt(payments.filter((p) => p.status === "SUCCEEDED" && p.receivedAt.getFullYear() === now.getFullYear()).reduce((a, p) => a + toMinor(p.amount), 0))} />

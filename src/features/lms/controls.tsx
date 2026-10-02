@@ -104,11 +104,11 @@ export function GradeForm({ submissionId, max, marks, feedback, penalty, assignm
 // ───────────────────────── Quiz question editor ─────────────────────────
 
 type QType = "SINGLE" | "MULTIPLE" | "TRUE_FALSE" | "SHORT" | "NUMERIC";
-export interface QuestionValue { id?: string; type: QType; prompt: string; options: { id: string; text: string }[]; answer: Record<string, unknown>; marks: number; explanation: string; order: number }
+export interface QuestionValue { id?: string; type: QType; prompt: string; options: { id: string; text: string }[]; answer: Record<string, unknown>; marks: number; explanation: string; order: number; outcomeId?: string | null }
 const TYPE_LABEL: Record<QType, string> = { SINGLE: "Single choice", MULTIPLE: "Multiple choice", TRUE_FALSE: "True / false", SHORT: "Short answer", NUMERIC: "Numeric" };
 const defaultAnswer = (t: QType): Record<string, unknown> => (t === "SINGLE" || t === "MULTIPLE" ? { correct: [] } : t === "TRUE_FALSE" ? { correct: true } : t === "SHORT" ? { accepted: [""], caseSensitive: false } : { value: 0, tolerance: 0 });
 
-export function QuestionEditor({ quizId, initial, trigger }: { quizId: string; initial?: QuestionValue; trigger: React.ReactNode }) {
+export function QuestionEditor({ quizId, initial, trigger, outcomes = [] }: { quizId: string; initial?: QuestionValue; trigger: React.ReactNode; outcomes?: { id: string; code: string; description: string }[] }) {
   const { pending, run } = useRun();
   const blank: QuestionValue = { type: "SINGLE", prompt: "", options: [{ id: "a", text: "" }, { id: "b", text: "" }], answer: { correct: [] }, marks: 1, explanation: "", order: 0 };
   const [open, setOpen] = useState(false);
@@ -163,12 +163,15 @@ export function QuestionEditor({ quizId, initial, trigger }: { quizId: string; i
               <div className="space-y-1.5"><Label htmlFor="qe-tol">Tolerance (±)</Label><Input id="qe-tol" type="number" min={0} step="any" value={String(v.answer.tolerance ?? 0)} onChange={(e) => setV({ ...v, answer: { ...v.answer, tolerance: Number(e.target.value) } })} /></div>
             </div>
           )}
+          {outcomes.length > 0 && (
+            <div className="space-y-1.5"><Label htmlFor="qe-co">Course outcome assessed (optional)</Label><select id="qe-co" className={field} value={v.outcomeId ?? ""} onChange={(e) => setV({ ...v, outcomeId: e.target.value || null })}><option value="">—</option>{outcomes.map((o) => <option key={o.id} value={o.id}>{o.code} — {o.description.slice(0, 80)}</option>)}</select></div>
+          )}
           <div className="space-y-1.5"><Label htmlFor="qe-exp">Explanation shown in review (optional)</Label><Textarea id="qe-exp" rows={2} value={v.explanation} onChange={(e) => setV({ ...v, explanation: e.target.value })} /></div>
         </div>
         <DialogFooter>
           <Button disabled={pending} onClick={() => {
             const answer = v.type === "SHORT" ? { ...v.answer, accepted: ((v.answer.accepted as string[]) ?? []).map((s) => s.trim()).filter(Boolean) } : v.answer;
-            run(() => saveQuestionAction(quizId, initial?.id ?? null, { type: v.type, prompt: v.prompt, options: v.type === "SINGLE" || v.type === "MULTIPLE" ? v.options : null, answer, marks: v.marks, explanation: v.explanation || null, order: v.order }), () => setOpen(false));
+            run(() => saveQuestionAction(quizId, initial?.id ?? null, { type: v.type, prompt: v.prompt, options: v.type === "SINGLE" || v.type === "MULTIPLE" ? v.options : null, answer, marks: v.marks, explanation: v.explanation || null, order: v.order, outcomeId: v.outcomeId ?? null }), () => setOpen(false));
           }}>{pending && <Loader2 className="animate-spin" />} Save question</Button>
         </DialogFooter>
       </DialogContent>

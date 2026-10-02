@@ -1,6 +1,10 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
+import { LOCALE_COOKIE, isLocale } from "@/lib/i18n";
+import { invalid } from "@/server/errors";
 import { getAuth, requireAuth } from "@/server/auth/current";
 import { destroyCurrentSession } from "@/server/auth/session";
 import { runAction } from "@/server/action";
@@ -34,4 +38,15 @@ export async function logoutAction() {
   const userId = await destroyCurrentSession();
   if (userId) await audit({ actorId: userId, actorName: ctx?.user.name, action: "auth.logout", resourceType: "user", resourceId: userId, summary: "Signed out" });
   redirect("/login?signedOut=1");
+}
+
+/** Change the interface language: saved on the account when signed in, and in a cookie for the sign-in page. */
+export async function setLocaleAction(locale: string) {
+  return runAction(async () => {
+    if (!isLocale(locale)) throw invalid("Unknown language.");
+    const ctx = await getAuth();
+    if (ctx) await db.user.update({ where: { id: ctx.user.id }, data: { locale } });
+    (await cookies()).set(LOCALE_COOKIE, locale, { httpOnly: false, sameSite: "lax", path: "/", maxAge: 365 * 86_400 });
+    revalidatePath("/", "layout");
+  });
 }

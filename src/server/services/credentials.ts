@@ -1,4 +1,5 @@
 import "server-only";
+import { revokeAcademicVcs } from "@/server/services/vc";
 import { z } from "zod";
 import { CredentialType } from "@/generated/prisma/enums";
 import { loadStudentFor } from "@/server/auth/access";
@@ -33,6 +34,7 @@ export async function revokeCredential(ctx: AuthContext, id: string, reason: str
   if (c.status === "REVOKED") throw conflict("Already revoked.");
   await db.$transaction(async (tx) => {
     await tx.issuedCredential.update({ where: { id }, data: { status: "REVOKED", revokedAt: new Date(), revokeReason: reason } });
+    await revokeAcademicVcs(tx, id);
     await audit({ actorId: ctx.user.id, actorName: ctx.user.name, action: "credential.revoke", resourceType: "student", resourceId: c.studentId, summary: `${c.serialNo} revoked — ${reason}` }, tx);
   });
 }

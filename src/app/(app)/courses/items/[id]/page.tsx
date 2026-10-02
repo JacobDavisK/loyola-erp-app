@@ -22,6 +22,11 @@ export default async function LearningItemPage({ params }: { params: Promise<{ i
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <PageHeader eyebrow={item.module.title} title={item.title} breadcrumbs={[{ label: "Course", href: back }, { label: item.title }]} />
+      {item.kind === "LTI" && item.ltiLinkId && (
+        <Section title="External tool" description="Opens the tool in this window; you are signed in to it automatically.">
+          <a className="inline-flex h-9 items-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground hover:bg-primary/90" href={`/lti/launch/${item.ltiLinkId}`}>Open {item.title}</a>
+        </Section>
+      )}
       {item.kind === "PAGE" && <Section title="Content"><div className="prose-sm max-w-none whitespace-pre-wrap text-sm leading-relaxed">{item.body}</div></Section>}
       {(item.kind === "LINK" || item.kind === "VIDEO") && item.url && (
         <Section title={item.kind === "VIDEO" ? "Video" : "Link"}>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { FileText, Link2, Megaphone, Plus, PlayCircle, Trash2 } from "lucide-react";
+import { FileText, Link2, Megaphone, Plug, Plus, PlayCircle, Trash2 } from "lucide-react";
 import type { Metadata } from "next";
 import { FormDialog } from "@/components/app/form-dialog";
 import { DataTable, LinkTabs, Td } from "@/components/app/list";
@@ -9,6 +9,9 @@ import { Button } from "@/components/ui/button";
 import { ActionButton } from "@/features/academic-ops/controls";
 import { deleteAnnouncementAction, deleteItemAction, deleteModuleAction, postAnnouncementAction, saveAssignmentAction, saveItemAction, saveModuleAction, saveQuizAction } from "@/features/lms/actions";
 import { TransferForm, UploadMaterialDialog } from "@/features/lms/controls";
+import { ItemOutcomePicker } from "@/features/success/controls";
+import { addLtiLinkAction } from "@/features/teaching/actions";
+import { toolFields } from "@/features/teaching/fields";
 import { ANNOUNCEMENT_FIELDS, assignmentFields, ITEM_FIELDS, MODULE_FIELDS, quizFields } from "@/features/lms/fields";
 import { fmtDateTimeZoned, toZonedInput } from "@/lib/format";
 import { requirePageAuth } from "@/server/auth/current";
@@ -18,7 +21,7 @@ import { courseSpace, gradebook } from "@/server/services/lms";
 
 export const metadata: Metadata = { title: "Course space" };
 
-const ICON = { PAGE: FileText, FILE: FileText, LINK: Link2, VIDEO: PlayCircle } as const;
+const ICON = { PAGE: FileText, FILE: FileText, LINK: Link2, VIDEO: PlayCircle, LTI: Plug } as const;
 
 export default async function TeacherCoursePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const { id } = await params;
@@ -31,10 +34,12 @@ export default async function TeacherCoursePage({ params, searchParams }: { para
   const inst = await getInstitution();
   const tz = inst.timezone;
   const [modules, students] = await Promise.all([
-    db.courseModule.findMany({ where: { offeringId: id }, orderBy: [{ order: "asc" }, { createdAt: "asc" }], include: { items: { orderBy: [{ order: "asc" }, { createdAt: "asc" }], include: { file: { select: { originalName: true, size: true } }, _count: { select: { views: true } } } } } }),
+    db.courseModule.findMany({ where: { offeringId: id }, orderBy: [{ order: "asc" }, { createdAt: "asc" }], include: { items: { orderBy: [{ order: "asc" }, { createdAt: "asc" }], include: { file: { select: { originalName: true, size: true } }, outcomes: { select: { outcomeId: true } }, _count: { select: { views: true } } } } } }),
     db.courseRegistration.count({ where: { offeringId: id, status: { in: ["REGISTERED", "COMPLETED"] } } }),
   ]);
   const moduleOpts = modules.map((m) => ({ id: m.id, title: m.title }));
+  const tools = edit ? await db.ltiTool.findMany({ where: { enabled: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }) : [];
+  const outcomes = await db.learningOutcome.findMany({ where: { courseId: o.course.id }, orderBy: { code: "asc" }, select: { id: true, code: true } });
   const tabs = ["content", "announcements", "assignments", "quizzes", "gradebook"].map((k) => ({ key: k, label: k[0].toUpperCase() + k.slice(1), href: `?tab=${k}` }));
   const now = new Date();
 
@@ -45,7 +50,7 @@ export default async function TeacherCoursePage({ params, searchParams }: { para
         title={o.course.title}
         breadcrumbs={[{ label: "My teaching", href: "/teaching" }, { label: `${o.course.code}-${o.section}` }]}
         description={`${students} student(s) · instructors: ${o.instructors.map((i) => i.user.name).join(", ") || "none"}${edit ? "" : " · view only"}`}
-        actions={<Button asChild size="sm" variant="outline"><Link href={`/academics/offerings/${id}`}>Class record</Link></Button>}
+        actions={<><Button asChild size="sm" variant="outline"><Link href={`/obe/classes/${id}`}>Outcome attainment</Link></Button><Button asChild size="sm" variant="outline"><Link href={`/academics/offerings/${id}`}>Class record</Link></Button></>}
       />
       <LinkTabs tabs={tabs} active={tab} />
 
@@ -62,6 +67,7 @@ export default async function TeacherCoursePage({ params, searchParams }: { para
                 <div className="flex gap-1.5">
                   <FormDialog title="Item" columns={2} fields={ITEM_FIELDS} action={saveItemAction.bind(null, m.id)} initial={{ kind: "PAGE", order: m.items.length, isPublished: true }} trigger={<Button size="xs" variant="outline"><Plus /> Item</Button>} />
                   <UploadMaterialDialog moduleId={m.id} />
+                  {tools.length > 0 && <FormDialog title="External tool" fields={toolFields(tools)} action={addLtiLinkAction.bind(null, m.id)} submitLabel="Add tool" initial={{ toolId: tools[0].id }} trigger={<Button size="xs" variant="outline"><Plug /> Tool</Button>} />}
                   <FormDialog title="Module" id={m.id} fields={MODULE_FIELDS} action={saveModuleAction.bind(null, id)} initial={{ title: m.title, description: m.description, order: m.order, isPublished: m.isPublished }} />
                   {m.items.length === 0 && <ActionButton size="xs" label="" ariaLabel="Delete module" icon={<Trash2 />} variant="ghost" run={deleteModuleAction.bind(null, m.id)} confirmText={`Delete module "${m.title}"?`} />}
                 </div>
@@ -78,6 +84,7 @@ export default async function TeacherCoursePage({ params, searchParams }: { para
                         <Link href={`/courses/items/${it.id}`} className="min-w-40 flex-1 text-sm hover:text-primary">{it.title}{it.file && <span className="ml-2 text-xs text-muted-foreground">{it.file.originalName} · {Math.ceil(it.file.size / 1024)} KB</span>}</Link>
                         <span className="text-xs text-muted-foreground">{!it.isPublished ? "hidden" : it.availableFrom && it.availableFrom > now ? `from ${fmtDateTimeZoned(it.availableFrom, tz)}` : `${it._count.views}/${students} opened`}</span>
                         {edit && it.kind !== "FILE" && <FormDialog title="Item" columns={2} id={it.id} fields={ITEM_FIELDS} action={saveItemAction.bind(null, m.id)} initial={{ kind: it.kind, title: it.title, url: it.url, body: it.body, order: it.order, isPublished: it.isPublished, availableFrom: toZonedInput(it.availableFrom, tz) }} />}
+                        {edit && <ItemOutcomePicker itemId={it.id} outcomes={outcomes} selected={it.outcomes.map((x) => x.outcomeId)} />}
                         {edit && <ActionButton size="xs" variant="ghost" label="" ariaLabel="Delete item" icon={<Trash2 />} run={deleteItemAction.bind(null, it.id)} confirmText={`Delete "${it.title}"?`} />}
                       </li>
                     );

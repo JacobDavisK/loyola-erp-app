@@ -1,0 +1,169 @@
+// ───────────────────────── Student success: early warning, support cases, mentoring, knowledge base,
+//                            degree planning and outcome-based learning recommendations ─────────────────────────
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+/// The latest early-warning assessment of a student for a term (recomputed by the `success.risk` job).
+/// `factors` explains the score: each contributing signal with its value and weight.
+model StudentRisk {
+  id         String    @id @default(cuid())
+  studentId  String
+  termId     String
+  score      Float
+  level      RiskLevel
+  factors    Json
+  computedAt DateTime  @default(now())
+  student    Student   @relation(fields: [studentId], references: [id])
+  term       AcademicTerm @relation(fields: [termId], references: [id])
+
+  @@unique([studentId, termId])
+  @@index([termId, level])
+}
+
+enum CaseSource {
+  SYSTEM
+  STAFF
+  SELF
+}
+
+enum CaseStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+/// A student who needs support: opened automatically when the risk level turns high, by a teacher or
+/// mentor who is worried, or by the student asking for help. Worked by the mentor or a success manager.
+model SupportCase {
+  id          String       @id @default(cuid())
+  number      String       @unique
+  studentId   String
+  source      CaseSource
+  raisedById  String?
+  level       RiskLevel
+  summary     String
+  reasons     Json
+  status      CaseStatus   @default(OPEN)
+  assigneeId  String?
+  dueAt       DateTime
+  resolution  String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  closedAt    DateTime?
+  student     Student      @relation(fields: [studentId], references: [id])
+  raisedBy    User?        @relation("CaseRaisedBy", fields: [raisedById], references: [id])
+  assignee    User?        @relation("CaseAssignee", fields: [assigneeId], references: [id])
+  notes       CaseNote[]
+
+  @@index([status, dueAt])
+  @@index([studentId])
+  @@index([assigneeId, status])
+}
+
+enum CaseNoteKind {
+  NOTE
+  CONTACT
+  REFERRAL
+  STATUS
+}
+
+/// Case history. Append-only.
+model CaseNote {
+  id        String       @id @default(cuid())
+  caseId    String
+  authorId  String
+  kind      CaseNoteKind @default(NOTE)
+  body      String
+  createdAt DateTime     @default(now())
+  case      SupportCase  @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  author    User         @relation("CaseNoteAuthor", fields: [authorId], references: [id])
+
+  @@index([caseId, createdAt])
+}
+
+/// A student's faculty mentor (advisor). At most one active assignment per student.
+model MentorAssignment {
+  id           String    @id @default(cuid())
+  studentId    String
+  mentorId     String
+  startsOn     DateTime  @db.Date
+  endsOn       DateTime? @db.Date
+  assignedById String
+  createdAt    DateTime  @default(now())
+  student      Student   @relation(fields: [studentId], references: [id])
+  mentor       User      @relation("Mentor", fields: [mentorId], references: [id])
+
+  @@index([mentorId, endsOn])
+  @@index([studentId])
+}
+
+enum MeetingMode {
+  IN_PERSON
+  ONLINE
+  PHONE
+}
+
+/// A mentoring meeting. The summary and action items are shared with the student; private notes are not.
+model MentorMeeting {
+  id           String      @id @default(cuid())
+  studentId    String
+  mentorId     String
+  heldOn       DateTime
+  mode         MeetingMode @default(IN_PERSON)
+  summary      String
+  actionItems  Json        @default("[]")
+  privateNotes String?
+  followUpOn   DateTime?   @db.Date
+  createdAt    DateTime    @default(now())
+  student      Student     @relation(fields: [studentId], references: [id])
+  mentor       User        @relation("MentorMeetings", fields: [mentorId], references: [id])
+
+  @@index([studentId, heldOn])
+  @@index([mentorId, heldOn])
+}
+
+/// Institution knowledge base: answers the AI assistant (and the search fallback) draws on.
+model KnowledgeArticle {
+  id          String         @id @default(cuid())
+  slug        String         @unique
+  title       String
+  body        String
+  category    String
+  audience    NoticeAudience @default(ALL)
+  tags        String[]
+  published   Boolean        @default(false)
+  updatedById String
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([published, category])
+  @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "KnowledgeArticle_title_trgm_idx")
+}
+
+/// Degree planner: a course the student intends to take in a future semester.
+model PlanEntry {
+  id        String   @id @default(cuid())
+  studentId String
+  courseId  String
+  semester  Int
+  createdAt DateTime @default(now())
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course    Course   @relation(fields: [courseId], references: [id])
+
+  @@unique([studentId, courseId])
+}
+
+/// Course material tagged with the course outcomes it teaches (drives learning recommendations).
+model LearningItemOutcome {
+  itemId    String
+  outcomeId String
+  item      LearningItem    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  outcome   LearningOutcome @relation(fields: [outcomeId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, outcomeId])
+}

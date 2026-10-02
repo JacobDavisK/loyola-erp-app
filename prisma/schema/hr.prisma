@@ -131,6 +131,7 @@ model Employee {
   libraryLoans    LibraryLoan[]
   libraryHolds    LibraryHold[]
   publications    PublicationAuthor[]
+  clinicVisits    ClinicVisit[]
 
   @@index([departmentId, status])
   @@index([lastName, firstName])

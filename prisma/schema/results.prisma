@@ -98,6 +98,7 @@ enum CredentialType {
   COURSE_COMPLETION
   RANK_CERTIFICATE
   TRANSFER_CERTIFICATE
+  EXIT_CERTIFICATE
 }
 
 enum CredentialStatus {
@@ -181,6 +182,7 @@ model AssessmentComponent {
   offering      CourseOffering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
   examination   Examination?   @relation(fields: [examinationId], references: [id])
   sheet         MarkSheet?
+  outcomes      ComponentOutcome[]
   marks         Mark[]
 
   @@unique([offeringId, name])

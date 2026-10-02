@@ -26,10 +26,18 @@ export const STANDARD_ACCOUNTS = {
   TAX_PAYABLE: { code: "2320", name: "Tax deducted at source payable", type: "LIABILITY" },
   SALARY_EXPENSE: { code: "5200", name: "Salaries and wages", type: "EXPENSE" },
   EMPLOYER_CONTRIBUTIONS: { code: "5210", name: "Employer statutory contributions", type: "EXPENSE" },
+  INVENTORY: { code: "1300", name: "Stores inventory", type: "ASSET" },
+  FIXED_ASSETS: { code: "1500", name: "Fixed assets (at cost)", type: "ASSET" },
+  ACCUMULATED_DEPRECIATION: { code: "1590", name: "Accumulated depreciation", type: "ASSET" },
+  ACCOUNTS_PAYABLE: { code: "2400", name: "Vendors payable", type: "LIABILITY" },
+  PURCHASES_EXPENSE: { code: "5300", name: "Services and purchases", type: "EXPENSE" },
+  CONSUMABLES_EXPENSE: { code: "5310", name: "Stores consumed", type: "EXPENSE" },
+  DEPRECIATION_EXPENSE: { code: "5400", name: "Depreciation", type: "EXPENSE" },
+  ASSET_DISPOSAL: { code: "5410", name: "Loss / (gain) on disposal of assets", type: "EXPENSE" },
 } as const;
 export type StdAccount = keyof typeof STANDARD_ACCOUNTS;
 
-async function accountId(tx: Tx, key: StdAccount): Promise<string> {
+export async function accountId(tx: Tx, key: StdAccount): Promise<string> {
   const a = STANDARD_ACCOUNTS[key];
   const found = await tx.ledgerAccount.findUnique({ where: { code: a.code } });
   if (found) return found.id;
@@ -41,6 +49,7 @@ export interface PostingLine {
   debit?: Minor;
   credit?: Minor;
   studentId?: string | null;
+  departmentId?: string | null;
 }
 
 export async function postJournal(
@@ -57,7 +66,7 @@ export async function postJournal(
   return tx.journalEntry.create({
     data: {
       number, date: entry.date ?? new Date(), memo: entry.memo, sourceType: entry.sourceType ?? null, sourceId: entry.sourceId ?? null, postedById: entry.postedById ?? null, reversesId: entry.reversesId ?? null,
-      lines: { create: resolved.map((l) => ({ accountId: l.accountId, debit: fromMinor(l.debit ?? 0), credit: fromMinor(l.credit ?? 0), studentId: l.studentId ?? null })) },
+      lines: { create: resolved.map((l) => ({ accountId: l.accountId, debit: fromMinor(l.debit ?? 0), credit: fromMinor(l.credit ?? 0), studentId: l.studentId ?? null, departmentId: l.departmentId ?? null })) },
     },
   });
 }

@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { PageHeader } from "@/components/app/page";
+import { PageHeader, Section } from "@/components/app/page";
+import { CheckInPanel } from "@/features/teaching/controls";
+import { db } from "@/server/db";
 import { AttendanceSheet } from "@/features/academic-ops/attendance-sheet";
 import { fmtDateTime, fmtDayZoned, fmtTime } from "@/lib/format";
 import { requirePageAuth } from "@/server/auth/current";
@@ -19,6 +21,8 @@ export default async function SessionAttendancePage({ params }: { params: Promis
   const early = m.startsAt.getTime() - new Date().getTime() > 30 * 60_000;
   const correcting = !r.editableByInstructor;
   const readOnly = m.status === "CANCELLED" || early || (correcting && !r.canCorrect);
+  const win = await db.checkInWindow.findUnique({ where: { meetingId: id }, select: { closesAt: true } });
+  const ended = m.endsAt.getTime() < new Date().getTime() - 30 * 60_000;
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
@@ -30,6 +34,11 @@ export default async function SessionAttendancePage({ params }: { params: Promis
       {early && <p className="mb-4 rounded-lg border px-4 py-3 text-sm">Attendance opens 30 minutes before the class starts.</p>}
       {correcting && !readOnly && <p className="mb-4 rounded-lg border border-tone-warning/40 bg-tone-warning/5 px-4 py-3 text-sm">The instructor edit window closed on {fmtDateTime(r.editableUntil)}. Your changes are recorded as corrections with the previous marks.</p>}
       {correcting && readOnly && m.status !== "CANCELLED" && !early && <p className="mb-4 rounded-lg border px-4 py-3 text-sm">The edit window closed on {fmtDateTime(r.editableUntil)}. Ask your Head of Department to correct a mark.</p>}
+      {!readOnly && !correcting && !ended && r.students.length > 0 && (
+        <Section className="mb-6" title="QR self check-in" description="Show a QR code on the classroom screen; students scan it with their phones and are marked present (or late). You can still correct any mark below.">
+          <CheckInPanel meetingId={id} initiallyOpen={!!win && win.closesAt > new Date()} />
+        </Section>
+      )}
       {r.students.length === 0 ? (
         <p className="surface-card p-6 text-sm text-muted-foreground">No students are registered in this class.</p>
       ) : (

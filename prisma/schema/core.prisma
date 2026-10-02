@@ -223,6 +223,8 @@ model User {
   passwordHash      String
   status            UserStatus @default(ACTIVE)
   userType          UserType   @default(STAFF)
+  /// Interface language: "en", "ta" or "hi"
+  locale            String     @default("en")
   departmentId      String?
   avatarAssetId     String?
   failedLoginCount  Int        @default(0)
@@ -281,6 +283,22 @@ model User {
   announcementsAuthored Announcement[]       @relation("AnnouncementAuthor")
   savedReports          SavedReport[]        @relation("SavedReportOwner")
   aiRequests            AiRequest[]          @relation("AiRequestUser")
+  consents              ConsentRecord[]
+  dataRequests          DataRequest[]        @relation("DataRequester")
+  casesRaised           SupportCase[]        @relation("CaseRaisedBy")
+  casesAssigned         SupportCase[]        @relation("CaseAssignee")
+  caseNotes             CaseNote[]           @relation("CaseNoteAuthor")
+  mentees               MentorAssignment[]   @relation("Mentor")
+  mentorMeetings        MentorMeeting[]      @relation("MentorMeetings")
+  pushSubscriptions     PushSubscription[]
+  contactPreference     ContactPreference?
+  counsellingSlots      CounsellingSlot[]    @relation("CounsellorSlots")
+  grievancesRaised      Grievance[]          @relation("GrievanceRaisedBy")
+  clubsCoordinated      Club[]               @relation("ClubCoordinator")
+  eventRegistrations    EventRegistration[]  @relation("EventRegistrant")
+  identities            UserIdentity[]
+  apiTokens             ApiToken[]
+  calendarFeed          CalendarFeed?
 
   @@index([departmentId])
   @@index([userType])
@@ -472,6 +490,10 @@ model Department {
   researchProjects ResearchProject[]
   publications   Publication[]
   announcements  Announcement[]
+  budgets          Budget[]
+  purchaseRequests PurchaseRequest[]
+  purchaseOrders   PurchaseOrder[]
+  assets           Asset[]
 }
 
 model Program {
@@ -495,6 +517,8 @@ model Program {
   announcements Announcement[]
   admissionSeats AdmissionSeat[]
   admissionApplications AdmissionApplication[]
+  exitAwards    ProgramExitAward[]
+  outcomes      ProgramOutcome[]
 }
 
 model Regulation {
@@ -524,6 +548,7 @@ model AcademicYear {
   scholarshipApplications ScholarshipApplication[]
   accreditationCycles AccreditationCycle[]
   admissionCycles AdmissionCycle[]
+  antiRaggingUndertakings AntiRaggingUndertaking[]
 }
 
 model Semester {
@@ -567,6 +592,8 @@ model Course {
   prerequisites   CoursePrerequisite[] @relation("CoursePrerequisites")
   prerequisiteOf  CoursePrerequisite[] @relation("PrerequisiteOf")
   curricula       CurriculumCourse[]
+  externalEquivalents ExternalCredit[]
+  planEntries     PlanEntry[]
 
   @@unique([code, regulationId])
   @@index([title(ops: raw("gin_trgm_ops"))], type: Gin, map: "Course_title_trgm_idx")
@@ -607,6 +634,10 @@ model LearningOutcome {
   bloom       BloomLevel?
   course      Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
   questions   Question[]
+  poMappings  CoPoMapping[]
+  items       LearningItemOutcome[]
+  quizQuestions QuizQuestion[]
+  components  ComponentOutcome[]
 
   @@unique([courseId, code])
 }
@@ -1105,6 +1136,8 @@ model Notification {
   body      String?
   link      String?
   readAt    DateTime?
+  /// When push / SMS / WhatsApp delivery was attempted (null = not yet)
+  dispatchedAt DateTime?
   createdAt DateTime  @default(now())
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 

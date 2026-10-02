@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { CheckCircle2, FileText, Link2, PlayCircle } from "lucide-react";
+import { CheckCircle2, FileText, Link2, PlayCircle, Plug } from "lucide-react";
 import type { Metadata } from "next";
 import { DataTable, LinkTabs, Td } from "@/components/app/list";
 import { EmptyState, PageHeader, Section } from "@/components/app/page";
@@ -13,7 +13,7 @@ import { courseSpace } from "@/server/services/lms";
 
 export const metadata: Metadata = { title: "Course" };
 
-const ICON = { PAGE: FileText, FILE: FileText, LINK: Link2, VIDEO: PlayCircle } as const;
+const ICON = { PAGE: FileText, FILE: FileText, LINK: Link2, VIDEO: PlayCircle, LTI: Plug } as const;
 
 export default async function StudentCoursePage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const { id } = await params;

@@ -1,0 +1,322 @@
+// ───────────────────────── Campus life: push and SMS/WhatsApp messaging, counselling, grievances and
+//                            anti-ragging, clubs and events, convocation ─────────────────────────
+
+// ── Mobile app push and messaging ──
+
+/// A browser / installed-app push subscription (Web Push).
+model PushSubscription {
+  id         String   @id @default(cuid())
+  userId     String
+  endpoint   String   @unique
+  p256dh     String
+  auth       String
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  lastUsedAt DateTime?
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// A person's choice of SMS / WhatsApp for important alerts. Opting in is their consent to those channels.
+model ContactPreference {
+  userId     String   @id
+  phone      String?
+  sms        Boolean  @default(false)
+  whatsapp   Boolean  @default(false)
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum MessageChannel {
+  SMS
+  WHATSAPP
+}
+
+enum MessageStatus {
+  QUEUED
+  SENT
+  FAILED
+  SKIPPED
+}
+
+model MessageOutbox {
+  id             String         @id @default(cuid())
+  channel        MessageChannel
+  userId         String?
+  to             String
+  body           String
+  status         MessageStatus  @default(QUEUED)
+  providerId     String?
+  error          String?
+  notificationId String?
+  inbound        Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  sentAt         DateTime?
+
+  @@index([status, createdAt])
+  @@index([userId, createdAt])
+}
+
+// ── Counselling ──
+
+enum CounsellingMode {
+  IN_PERSON
+  ONLINE
+  PHONE
+}
+
+enum SlotStatus {
+  OPEN
+  BOOKED
+  CANCELLED
+}
+
+model CounsellingSlot {
+  id           String              @id @default(cuid())
+  counsellorId String
+  startsAt     DateTime
+  endsAt       DateTime
+  mode         CounsellingMode     @default(IN_PERSON)
+  location     String?
+  status       SlotStatus          @default(OPEN)
+  createdAt    DateTime            @default(now())
+  counsellor   User                @relation("CounsellorSlots", fields: [counsellorId], references: [id])
+  booking      CounsellingBooking?
+
+  @@index([counsellorId, startsAt])
+  @@index([status, startsAt])
+}
+
+enum BookingStatus {
+  BOOKED
+  ATTENDED
+  NO_SHOW
+  CANCELLED
+}
+
+/// A booked session. The reason and the counsellor's notes are confidential to counselling staff.
+model CounsellingBooking {
+  id         String          @id @default(cuid())
+  slotId     String          @unique
+  studentId  String
+  reason     String?
+  status     BookingStatus   @default(BOOKED)
+  notes      String?
+  crisis     Boolean         @default(false)
+  followUpOn DateTime?       @db.Date
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+  slot       CounsellingSlot @relation(fields: [slotId], references: [id])
+  student    Student         @relation(fields: [studentId], references: [id])
+
+  @@index([studentId])
+}
+
+// ── Grievance redressal (UGC Regulations 2023) and anti-ragging ──
+
+enum GrievanceCategory {
+  ACADEMIC
+  EXAMINATION
+  FEES
+  ADMINISTRATION
+  FACILITIES
+  HARASSMENT
+  RAGGING
+  DISCRIMINATION
+  OTHER
+}
+
+enum GrievanceLevel {
+  DEPARTMENT
+  INSTITUTION
+  OMBUDSPERSON
+}
+
+enum GrievanceStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  RESOLVED
+  APPEALED
+  CLOSED
+}
+
+model Grievance {
+  id           String            @id @default(cuid())
+  number       String            @unique
+  raisedById   String
+  studentId    String?
+  /// Ragging and harassment complaints may hide the complainant's identity from the committee.
+  anonymous    Boolean           @default(false)
+  category     GrievanceCategory
+  subject      String
+  description  String
+  departmentId String?
+  level        GrievanceLevel    @default(DEPARTMENT)
+  status       GrievanceStatus   @default(SUBMITTED)
+  dueAt        DateTime
+  resolution   String?
+  resolvedAt   DateTime?
+  closedAt     DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  raisedBy     User              @relation("GrievanceRaisedBy", fields: [raisedById], references: [id])
+  student      Student?          @relation(fields: [studentId], references: [id])
+  actions      GrievanceAction[]
+
+  @@index([status, dueAt])
+  @@index([raisedById])
+}
+
+/// Grievance history. Append-only.
+model GrievanceAction {
+  id          String    @id @default(cuid())
+  grievanceId String
+  actorId     String?
+  action      String
+  note        String?
+  createdAt   DateTime  @default(now())
+  grievance   Grievance @relation(fields: [grievanceId], references: [id], onDelete: Cascade)
+
+  @@index([grievanceId, createdAt])
+}
+
+/// The annual anti-ragging undertaking (affidavit) each student files on antiragging.in.
+model AntiRaggingUndertaking {
+  id             String       @id @default(cuid())
+  studentId      String
+  academicYearId String
+  referenceNo    String
+  submittedAt    DateTime     @default(now())
+  student        Student      @relation(fields: [studentId], references: [id])
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  @@unique([studentId, academicYearId])
+}
+
+// ── Clubs, NSS / NCC, sports and events ──
+
+enum ClubKind {
+  CLUB
+  NSS
+  NCC
+  SPORTS
+  CULTURAL
+  PROFESSIONAL
+}
+
+model Club {
+  id            String       @id @default(cuid())
+  name          String       @unique
+  kind          ClubKind
+  description   String
+  coordinatorId String
+  active        Boolean      @default(true)
+  createdAt     DateTime     @default(now())
+  coordinator   User         @relation("ClubCoordinator", fields: [coordinatorId], references: [id])
+  members       ClubMember[]
+  events        CampusEvent[]
+}
+
+model ClubMember {
+  id        String    @id @default(cuid())
+  clubId    String
+  studentId String
+  role      String    @default("MEMBER")
+  /// Service / activity hours earned (NSS needs 240 hours over two years)
+  hours     Float     @default(0)
+  joinedAt  DateTime  @default(now())
+  leftAt    DateTime?
+  club      Club      @relation(fields: [clubId], references: [id], onDelete: Cascade)
+  student   Student   @relation(fields: [studentId], references: [id])
+
+  @@unique([clubId, studentId])
+}
+
+enum EventStatus {
+  DRAFT
+  PUBLISHED
+  CANCELLED
+  COMPLETED
+}
+
+model CampusEvent {
+  id                  String              @id @default(cuid())
+  title               String
+  description         String
+  clubId              String?
+  venue               String
+  roomId              String?
+  startsAt            DateTime
+  endsAt              DateTime
+  capacity            Int?
+  registrationCloses  DateTime?
+  /// Activity hours credited to attendees who are club members (NSS, NCC)
+  hours               Float?
+  /// Participation badge awarded to attendees when the event is completed
+  badgeId             String?
+  status              EventStatus         @default(DRAFT)
+  createdById         String
+  createdAt           DateTime            @default(now())
+  club                Club?               @relation(fields: [clubId], references: [id])
+  registrations       EventRegistration[]
+
+  @@index([status, startsAt])
+}
+
+model EventRegistration {
+  id           String      @id @default(cuid())
+  eventId      String
+  userId       String
+  studentId    String?
+  registeredAt DateTime    @default(now())
+  attendedAt   DateTime?
+  cancelledAt  DateTime?
+  event        CampusEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user         User        @relation("EventRegistrant", fields: [userId], references: [id])
+
+  @@unique([eventId, userId])
+}
+
+// ── Convocation ──
+
+enum ConvocationStatus {
+  PLANNED
+  REGISTRATION_OPEN
+  REGISTRATION_CLOSED
+  HELD
+}
+
+model Convocation {
+  id                String              @id @default(cuid())
+  title             String
+  heldOn            DateTime
+  venue             String
+  registrationCloses DateTime
+  maxGuests         Int                 @default(2)
+  status            ConvocationStatus   @default(PLANNED)
+  createdById       String
+  createdAt         DateTime            @default(now())
+  graduates         ConvocationGraduate[]
+}
+
+enum ConvocationAttendance {
+  IN_PERSON
+  IN_ABSENTIA
+}
+
+model ConvocationGraduate {
+  id             String                 @id @default(cuid())
+  convocationId  String
+  studentId      String
+  attendance     ConvocationAttendance?
+  guests         Int                    @default(0)
+  seatNo         String?
+  registeredAt   DateTime?
+  gownIssuedAt   DateTime?
+  degreeHandedAt DateTime?
+  convocation    Convocation            @relation(fields: [convocationId], references: [id], onDelete: Cascade)
+  student        Student                @relation(fields: [studentId], references: [id])
+
+  @@unique([convocationId, studentId])
+}

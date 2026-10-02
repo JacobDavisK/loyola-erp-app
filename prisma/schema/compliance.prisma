@@ -1,0 +1,293 @@
+// ───────────────────────── Regulatory compliance (India): APAAR / Academic Bank of Credits, NAD-DigiLocker,
+//                            NEP 2020 multiple entry and exit, credit transfer (SWAYAM / MOOCs),
+//                            outcome-based education (CO–PO attainment) and the DPDP Act 2023 ─────────────────────────
+
+// ── National Academic Depository / Academic Bank of Credits ──
+
+enum NadBatchKind {
+  ABC_CREDITS
+  NAD_MARKSHEET
+  NAD_DEGREE
+}
+
+enum NadBatchStatus {
+  GENERATED
+  SUBMITTED
+  ACKNOWLEDGED
+  REJECTED
+}
+
+/// One upload file prepared for the ABC / NAD portals. The rows are frozen when the batch is generated,
+/// so the file downloaded later is exactly what was reviewed; students without a verified APAAR ID are
+/// listed in `skipped` instead of being sent.
+model NadBatch {
+  id           String         @id @default(cuid())
+  number       String         @unique
+  kind         NadBatchKind
+  termId       String?
+  title        String
+  rows         Json
+  rowCount     Int
+  skipped      Json
+  status       NadBatchStatus @default(GENERATED)
+  reference    String? // portal acknowledgement / upload reference
+  remarks      String?
+  createdById  String
+  createdAt    DateTime       @default(now())
+  submittedAt  DateTime?
+  respondedAt  DateTime?
+  term         AcademicTerm?  @relation(fields: [termId], references: [id])
+
+  @@index([kind, createdAt])
+}
+
+// ── NEP 2020: multiple entry and exit ──
+
+/// An award a student may leave with after meeting the credit and duration requirements
+/// (e.g. UG Certificate after one year, UG Diploma after two, the degree after three or four).
+model ProgramExitAward {
+  id          String         @id @default(cuid())
+  programId   String
+  level       Int
+  title       String
+  minCredits  Float
+  minYears    Float
+  /// Years within which a student who exits with this award may re-enter.
+  reentryYears Int           @default(7)
+  createdAt   DateTime       @default(now())
+  program     Program        @relation(fields: [programId], references: [id], onDelete: Cascade)
+  requests    ExitRequest[]
+
+  @@unique([programId, level])
+}
+
+enum ExitRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  WITHDRAWN
+}
+
+model ExitRequest {
+  id               String            @id @default(cuid())
+  studentId        String
+  awardId          String
+  status           ExitRequestStatus @default(PENDING)
+  reason           String
+  creditsEarned    Float
+  workflowId       String?           @unique
+  credentialId     String?           @unique
+  reentryUntil     DateTime?
+  createdById      String
+  createdAt        DateTime          @default(now())
+  decidedAt        DateTime?
+  student          Student           @relation(fields: [studentId], references: [id])
+  award            ProgramExitAward  @relation(fields: [awardId], references: [id])
+
+  @@index([studentId])
+}
+
+// ── Credit transfer: SWAYAM, NPTEL, other MOOCs and other institutions ──
+
+enum ExternalCreditSource {
+  SWAYAM
+  NPTEL
+  MOOC
+  INSTITUTION
+}
+
+enum ExternalCreditStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model ExternalCredit {
+  id                String               @id @default(cuid())
+  studentId         String
+  source            ExternalCreditSource
+  provider          String
+  courseTitle       String
+  courseCode        String?
+  credits           Float
+  grade             String?
+  completedOn       DateTime             @db.Date
+  certificateNo     String?
+  certificateAssetId String?
+  /// The institution's course this replaces, when it is accepted as an equivalent.
+  mappedCourseId    String?
+  status            ExternalCreditStatus @default(PENDING)
+  remarks           String?
+  reviewedById      String?
+  reviewedAt        DateTime?
+  createdAt         DateTime             @default(now())
+  student           Student              @relation(fields: [studentId], references: [id])
+  mappedCourse      Course?              @relation(fields: [mappedCourseId], references: [id])
+
+  @@index([studentId, status])
+}
+
+// ── Outcome-based education ──
+
+enum OutcomeKind {
+  PO
+  PSO
+}
+
+/// Programme outcomes (POs) and programme-specific outcomes (PSOs).
+model ProgramOutcome {
+  id          String         @id @default(cuid())
+  programId   String
+  code        String
+  kind        OutcomeKind    @default(PO)
+  title       String
+  description String
+  order       Int            @default(0)
+  program     Program        @relation(fields: [programId], references: [id], onDelete: Cascade)
+  mappings    CoPoMapping[]
+
+  @@unique([programId, code])
+}
+
+/// Correlation of a course outcome with a programme outcome: 1 low, 2 medium, 3 high.
+model CoPoMapping {
+  outcomeId        String
+  programOutcomeId String
+  strength         Int
+  outcome          LearningOutcome @relation(fields: [outcomeId], references: [id], onDelete: Cascade)
+  programOutcome   ProgramOutcome  @relation(fields: [programOutcomeId], references: [id], onDelete: Cascade)
+
+  @@id([outcomeId, programOutcomeId])
+}
+
+/// Which course outcomes an assessment component measures. Its marks count towards each mapped outcome.
+model ComponentOutcome {
+  componentId String
+  outcomeId   String
+  component   AssessmentComponent @relation(fields: [componentId], references: [id], onDelete: Cascade)
+  outcome     LearningOutcome     @relation(fields: [outcomeId], references: [id], onDelete: Cascade)
+
+  @@id([componentId, outcomeId])
+}
+
+// ── DPDP Act 2023: notices, consent, data-principal requests, breaches, retention ──
+
+enum NoticeAudience {
+  ALL
+  STUDENT
+  STAFF
+  GUARDIAN
+}
+
+/// A privacy notice for one purpose. A changed text is a new version; consent is recorded per version.
+model ConsentNotice {
+  id          String          @id @default(cuid())
+  key         String
+  version     Int
+  title       String
+  purpose     String
+  body        String
+  audience    NoticeAudience  @default(ALL)
+  /// Required notices must be acknowledged before using the system; optional ones may be refused or withdrawn.
+  required    Boolean         @default(false)
+  active      Boolean         @default(true)
+  createdById String
+  createdAt   DateTime        @default(now())
+  records     ConsentRecord[]
+
+  @@unique([key, version])
+}
+
+enum ConsentDecision {
+  GRANTED
+  WITHDRAWN
+}
+
+/// Append-only consent ledger. The latest row per (user, notice key, subject) is the current decision.
+model ConsentRecord {
+  id         String          @id @default(cuid())
+  userId     String
+  noticeId   String
+  decision   ConsentDecision
+  /// Set when a guardian decides for a student who is a minor.
+  studentId  String?
+  ip         String?
+  userAgent  String?
+  createdAt  DateTime        @default(now())
+  user       User            @relation(fields: [userId], references: [id])
+  notice     ConsentNotice   @relation(fields: [noticeId], references: [id])
+
+  @@index([userId, noticeId])
+  @@index([studentId])
+}
+
+enum DataRequestType {
+  ACCESS
+  CORRECTION
+  ERASURE
+  NOMINATION
+  GRIEVANCE
+}
+
+enum DataRequestStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  REJECTED
+}
+
+model DataRequest {
+  id            String            @id @default(cuid())
+  number        String            @unique
+  userId        String
+  type          DataRequestType
+  details       String
+  status        DataRequestStatus @default(OPEN)
+  dueAt         DateTime
+  response      String?
+  exportAssetId String?
+  handledById   String?
+  createdAt     DateTime          @default(now())
+  closedAt      DateTime?
+  user          User              @relation("DataRequester", fields: [userId], references: [id])
+
+  @@index([status, dueAt])
+  @@index([userId])
+}
+
+enum BreachStatus {
+  OPEN
+  CONTAINED
+  NOTIFIED
+  CLOSED
+}
+
+model BreachIncident {
+  id               String       @id @default(cuid())
+  number           String       @unique
+  title            String
+  description      String
+  detectedAt       DateTime
+  severity         String // LOW, MEDIUM, HIGH, CRITICAL
+  dataCategories   String
+  affectedCount    Int          @default(0)
+  status           BreachStatus @default(OPEN)
+  containment      String?
+  boardNotifiedAt  DateTime?
+  usersNotifiedAt  DateTime?
+  closedAt         DateTime?
+  reportedById     String
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+}
+
+/// How long one kind of operational data is kept. Applied by the `privacy.retention` job.
+model RetentionRule {
+  id           String    @id @default(cuid())
+  dataset      String    @unique
+  retainDays   Int
+  active       Boolean   @default(true)
+  lastRunAt    DateTime?
+  lastAffected Int?
+  updatedAt    DateTime  @updatedAt
+}

@@ -13,7 +13,9 @@ import { getSetting } from "@/server/services/settings";
  *  - enforces a per-user daily request limit;
  *  - redacts obvious personal identifiers (e-mails, phone numbers, student/employee numbers) from user text;
  *  - logs usage (hash of the redacted prompt, token counts, latency, outcome) — never the prompt or the answer.
- * Features send the model schemas and the user's own words, never records from the database.
+ * Features send the model schemas and the user's own words, never records from the database — with one
+ * exception: the student assistant may include the student's OWN records (aggregated, without names or
+ * numbers), and only after the student has granted the optional "ai.assistant" consent.
  */
 
 export interface AiMessage { role: "user" | "assistant"; content: string }
@@ -57,12 +59,12 @@ export function aiProvider(): AiProvider | null {
   return null;
 }
 
-export type AiFeature = "reportAssistant" | "feedbackDrafts" | "announcementDrafts";
+export type AiFeature = "reportAssistant" | "feedbackDrafts" | "announcementDrafts" | "studentAssistant";
 
 export async function aiStatus() {
   const p = aiProvider();
   const s = await getSetting("ai");
-  return { configured: !!p, provider: p?.name ?? null, model: p?.model ?? null, enabled: s.enabled, features: { reportAssistant: s.reportAssistant, feedbackDrafts: s.feedbackDrafts, announcementDrafts: s.announcementDrafts }, dailyRequestsPerUser: s.dailyRequestsPerUser };
+  return { configured: !!p, provider: p?.name ?? null, model: p?.model ?? null, enabled: s.enabled, features: { reportAssistant: s.reportAssistant, feedbackDrafts: s.feedbackDrafts, announcementDrafts: s.announcementDrafts, studentAssistant: s.studentAssistant }, dailyRequestsPerUser: s.dailyRequestsPerUser };
 }
 
 /** Remove common personal identifiers from free text before it leaves the platform. */
@@ -75,7 +77,7 @@ export function redact(text: string): string {
     .replace(/\b[A-Z]{5}\d{4}[A-Z]\b/g, "[tax-id]");
 }
 
-export async function runAi(ctx: AuthContext, feature: AiFeature, input: { system: string; user: string; maxTokens?: number; temperature?: number }): Promise<string> {
+export async function runAi(ctx: AuthContext, feature: AiFeature, input: { system: string; user: string; history?: AiMessage[]; maxTokens?: number; temperature?: number }): Promise<string> {
   const provider = aiProvider();
   if (!provider) throw new AppError("AI assistance is not configured on this installation. An administrator can enable it by setting AI_PROVIDER=anthropic and ANTHROPIC_API_KEY.", "AI_NOT_CONFIGURED", 503);
   const s = await getSetting("ai");
@@ -89,7 +91,8 @@ export async function runAi(ctx: AuthContext, feature: AiFeature, input: { syste
   const log = (status: "OK" | "ERROR" | "REFUSED", usage?: AiCompletion, error?: string) =>
     db.aiRequest.create({ data: { userId: ctx.user.id, feature, provider: provider.name, model: provider.model, promptHash: sha256(`${input.system}\n${userText}`), inputTokens: usage?.inputTokens ?? 0, outputTokens: usage?.outputTokens ?? 0, latencyMs: Date.now() - started, status, error: error?.slice(0, 300) ?? null } });
   try {
-    const out = await provider.complete({ system: input.system, messages: [{ role: "user", content: userText }], maxTokens: input.maxTokens ?? 800, temperature: input.temperature });
+    const history = (input.history ?? []).slice(-8).map((m) => ({ role: m.role, content: redact(m.content).slice(0, 4000) }));
+    const out = await provider.complete({ system: input.system, messages: [...history, { role: "user", content: userText }], maxTokens: input.maxTokens ?? 800, temperature: input.temperature });
     await log("OK", out);
     return out.text;
   } catch (e) {

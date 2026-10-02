@@ -9,5 +9,8 @@ export const ADMIN_TABS = [
   { key: "workflow", label: "Examination rules", href: "/admin/workflow", perm: "admin.settings.manage" },
   { key: "system", label: "System health", href: "/admin/system", perm: "system.health" },
   { key: "ai", label: "AI assistance", href: "/admin/ai", perm: "admin.settings.manage" },
+  { key: "lti", label: "External tools (LTI)", href: "/admin/lti", perm: "lti.manage" },
+  { key: "messaging", label: "SMS & WhatsApp", href: "/admin/messaging", perm: "messaging.manage" },
+  { key: "integrations", label: "Integrations", href: "/admin/integrations", perm: "integration.manage" },
   { key: "backup", label: "Backup", href: "/admin/backup", perm: "admin.backup" },
 ] as const satisfies readonly { key: string; label: string; href: string; perm: PermissionKey }[];

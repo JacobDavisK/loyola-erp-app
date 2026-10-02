@@ -10,7 +10,7 @@ import { DATA_DIR, ENV_FILE, ROOT, fail, loadEnv, run, say, startDb } from "./co
 const [major, minor] = process.versions.node.split(".").map(Number);
 if (major < 20 || (major === 20 && minor < 9)) fail(`Node.js 20.9 or newer is required (found ${process.versions.node}). Install the LTS version from https://nodejs.org.`);
 
-console.log("\nEXAMCORE setup — this can take 10–30 minutes the first time and needs an internet connection.");
+console.log("\nSetup — this can take 10–30 minutes the first time and needs an internet connection.");
 
 // 1. Configuration with fresh secrets for this computer
 function findBrowser() {
@@ -75,7 +75,7 @@ try {
     say("Applying database migrations");
     await run("npx prisma migrate deploy");
     if (db.firstRun) {
-      say("Loading demo data (Example University)");
+      say("Loading demo data");
       await run("npx tsx prisma/seed.ts");
     } else {
       console.log("  Existing data kept. To reset to the demo data, delete the .pgdata folder and run setup again.");
@@ -91,4 +91,4 @@ try {
   fail(`${e.message}\nFix the problem above and run setup again.`);
 }
 
-console.log("\n\x1b[32m✔ Setup complete.\x1b[0m Run start.bat (Windows) or `node scripts/portable/start.mjs` to launch EXAMCORE.\n");
+console.log("\n\x1b[32m✔ Setup complete.\x1b[0m The application is ready to start.\n");

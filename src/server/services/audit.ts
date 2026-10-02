@@ -3,6 +3,7 @@ import type { Prisma } from "@/generated/prisma/client";
 import { chainHash } from "@/lib/hash";
 import { db, type Tx } from "@/server/db";
 import { requestMeta } from "@/server/request-context";
+import { enqueueWebhooks } from "@/server/services/webhook-outbox";
 
 export interface AuditEntry {
   actorId?: string | null;
@@ -59,6 +60,7 @@ export async function audit(entry: AuditEntry, tx?: Tx): Promise<void> {
         createdAt,
       },
     });
+    await enqueueWebhooks(t, { ...entry, at: createdAt });
   };
   if (tx) await run(tx);
   else await db.$transaction(run);

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import type { Metadata } from "next";
@@ -40,6 +41,7 @@ export default async function TeacherQuizPage({ params }: { params: Promise<{ id
   const locked = quiz.attempts.length > 0;
   const { timezone: tz } = await getInstitution();
   const modules = await db.courseModule.findMany({ where: { offeringId: id }, select: { id: true, title: true } });
+  const outcomes = await db.learningOutcome.findMany({ where: { courseId: s.offering.course.id }, orderBy: { code: "asc" }, select: { id: true, code: true, description: true } });
   const total = quiz.questions.reduce((a, q) => a + q.marks, 0);
   const submitted = quiz.attempts.filter((a) => a.status === "SUBMITTED");
   const avg = submitted.length ? Math.round((submitted.reduce((a, x) => a + (x.score ?? 0), 0) / submitted.length) * 100) / 100 : null;
@@ -50,8 +52,8 @@ export default async function TeacherQuizPage({ params }: { params: Promise<{ id
         title={quiz.title}
         breadcrumbs={[{ label: "Course space", href: `/teaching/courses/${id}?tab=quizzes` }, { label: quiz.title }]}
         description={`${quiz.isPublished ? "Published" : "Draft"} · ${fmtDateTimeZoned(quiz.opensAt, tz)} – ${fmtDateTimeZoned(quiz.closesAt, tz)}${quiz.timeLimitMinutes ? ` · ${quiz.timeLimitMinutes} minutes` : ""} · ${quiz.maxAttempts} attempt(s)`}
-        actions={edit && <FormDialog title="Quiz" columns={2} id={quiz.id} fields={quizFields(modules)} action={saveQuizAction.bind(null, id)} trigger={<Button size="sm" variant="outline">Settings</Button>}
-          initial={{ title: quiz.title, instructions: quiz.instructions, moduleId: quiz.moduleId, opensAt: toZonedInput(quiz.opensAt, tz), closesAt: toZonedInput(quiz.closesAt, tz), timeLimitMinutes: quiz.timeLimitMinutes, maxAttempts: quiz.maxAttempts, reviewPolicy: quiz.reviewPolicy, shuffleQuestions: quiz.shuffleQuestions, isPublished: quiz.isPublished }} />}
+        actions={<>{quiz.proctoring !== "NONE" && <Button asChild size="sm" variant="outline"><Link href={`/teaching/courses/${id}/quizzes/${quiz.id}/integrity`}>Integrity report</Link></Button>}{edit && <FormDialog title="Quiz" columns={2} id={quiz.id} fields={quizFields(modules)} action={saveQuizAction.bind(null, id)} trigger={<Button size="sm" variant="outline">Settings</Button>}
+          initial={{ title: quiz.title, instructions: quiz.instructions, moduleId: quiz.moduleId, opensAt: toZonedInput(quiz.opensAt, tz), closesAt: toZonedInput(quiz.closesAt, tz), timeLimitMinutes: quiz.timeLimitMinutes, maxAttempts: quiz.maxAttempts, reviewPolicy: quiz.reviewPolicy, proctoring: quiz.proctoring, shuffleQuestions: quiz.shuffleQuestions, isPublished: quiz.isPublished }} />}</>}
       />
       <div className="grid gap-4 [grid-template-columns:repeat(auto-fit,minmax(170px,1fr))]">
         <StatCard label="Questions" value={quiz.questions.length} hint={`${total} marks`} />
@@ -61,23 +63,23 @@ export default async function TeacherQuizPage({ params }: { params: Promise<{ id
       <Section
         title="Questions"
         description={locked ? "Locked: students have attempted this quiz." : "Answer keys never leave the server; students only receive the questions."}
-        actions={edit && !locked && <QuestionEditor quizId={quiz.id} trigger={<Button size="xs"><Plus /> Question</Button>} />}
+        actions={edit && !locked && <QuestionEditor quizId={quiz.id} outcomes={outcomes} trigger={<Button size="xs"><Plus /> Question</Button>} />}
         bodyClassName="p-0"
       >
         {quiz.questions.length === 0 ? <p className="px-5 py-4 text-sm text-muted-foreground">No questions yet.</p> : (
           <ol className="divide-y">
             {quiz.questions.map((q, i) => {
-              const value: QuestionValue = { id: q.id, type: q.type, prompt: q.prompt, options: (q.options as { id: string; text: string }[] | null) ?? [], answer: q.answer as Record<string, unknown>, marks: q.marks, explanation: q.explanation ?? "", order: q.order };
+              const value: QuestionValue = { id: q.id, type: q.type, prompt: q.prompt, options: (q.options as { id: string; text: string }[] | null) ?? [], answer: q.answer as Record<string, unknown>, marks: q.marks, explanation: q.explanation ?? "", order: q.order, outcomeId: q.outcomeId };
               return (
                 <li key={q.id} className="flex gap-3 px-5 py-3">
                   <span className="w-6 text-sm text-muted-foreground tabular">{i + 1}.</span>
                   <div className="min-w-0 flex-1 text-sm">
                     <p className="whitespace-pre-wrap">{q.prompt}</p>
-                    <p className="mt-1 text-xs text-muted-foreground">{TYPE[q.type]} · {q.marks} mark(s) · key: <span className="text-foreground">{keyText(q)}</span></p>
+                    <p className="mt-1 text-xs text-muted-foreground">{TYPE[q.type]} · {q.marks} mark(s){q.outcomeId ? ` · ${outcomes.find((o) => o.id === q.outcomeId)?.code ?? ""}` : ""} · key: <span className="text-foreground">{keyText(q)}</span></p>
                   </div>
                   {edit && !locked && (
                     <div className="flex gap-1">
-                      <QuestionEditor quizId={quiz.id} initial={value} trigger={<Button size="icon-xs" variant="ghost" aria-label="Edit question"><Pencil /></Button>} />
+                      <QuestionEditor quizId={quiz.id} initial={value} outcomes={outcomes} trigger={<Button size="icon-xs" variant="ghost" aria-label="Edit question"><Pencil /></Button>} />
                       <ActionButton size="xs" variant="ghost" label="" ariaLabel="Delete question" icon={<Trash2 />} run={deleteQuestionAction.bind(null, q.id)} confirmText="Delete this question?" />
                     </div>
                   )}

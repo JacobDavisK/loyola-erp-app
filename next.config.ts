@@ -22,6 +22,9 @@ const csp = [
   "object-src 'none'",
 ].join("; ");
 
+/** LTI launches post the login request / id_token to the external tool, so form-action must allow it there only. */
+const ltiCsp = csp.replace("form-action 'self'", `form-action 'self' https:${isDev ? " http:" : ""}`);
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   serverExternalPackages: ["@node-rs/argon2", "playwright-core", "embedded-postgres"],
@@ -38,11 +41,15 @@ const nextConfig: NextConfig = {
           { key: "X-Frame-Options", value: "DENY" },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "same-origin" },
-          { key: "Permissions-Policy", value: `camera=(), microphone=(), geolocation=(), payment=${razorpay ? '(self "https://api.razorpay.com")' : "()"}` },
+          // Camera (proctored quizzes) and location (classroom check-in) are for this site only, and only after the browser asks.
+          { key: "Permissions-Policy", value: `camera=(self), microphone=(), geolocation=(self), payment=${razorpay ? '(self "https://api.razorpay.com")' : "()"}` },
           { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
           ...(isDev ? [] : [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" }]),
         ],
       },
+      // Listed last so it replaces the default policy on these two routes.
+      { source: "/lti/launch/:path*", headers: [{ key: "Content-Security-Policy", value: ltiCsp }] },
+      { source: "/api/lti/authorize", headers: [{ key: "Content-Security-Policy", value: ltiCsp }] },
     ];
   },
 };

@@ -173,13 +173,14 @@ export const JOB_STATUS: Record<"QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | 
   CANCELLED: { label: "Cancelled", tone: "neutral", icon: "ban" },
 };
 
-export const STUDENT_STATUS: Record<"ACTIVE" | "ON_LEAVE" | "SUSPENDED" | "WITHDRAWN" | "DISCONTINUED" | "GRADUATED", StatusMeta> = {
+export const STUDENT_STATUS: Record<"ACTIVE" | "ON_LEAVE" | "SUSPENDED" | "WITHDRAWN" | "DISCONTINUED" | "GRADUATED" | "EXITED", StatusMeta> = {
   ACTIVE: { label: "Active", tone: "success", icon: "circle-dot" },
   ON_LEAVE: { label: "On leave", tone: "warning", icon: "undo-2" },
   SUSPENDED: { label: "Suspended", tone: "danger", icon: "ban" },
   WITHDRAWN: { label: "Withdrawn", tone: "neutral", icon: "archive" },
   DISCONTINUED: { label: "Discontinued", tone: "neutral", icon: "circle-x" },
   GRADUATED: { label: "Graduated", tone: "locked", icon: "badge-check" },
+  EXITED: { label: "Exited with award", tone: "neutral", icon: "stamp" },
 };
 
 export const OFFERING_STATUS: Record<"PLANNED" | "OPEN" | "CLOSED" | "CANCELLED" | "COMPLETED", StatusMeta> = {

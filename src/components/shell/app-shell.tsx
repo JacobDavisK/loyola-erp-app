@@ -17,6 +17,9 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { CommandPalette, type PaletteCommand } from "@/components/shell/command-palette";
+import { useT } from "@/components/i18n";
+import { LanguageSwitcher } from "@/components/language-switcher";
+import type { Locale } from "@/lib/i18n";
 import { NavIcon } from "@/components/shell/icons";
 import type { NavGroup } from "@/components/shell/nav";
 import { logoutAction, markAllNotificationsRead, markNotificationRead } from "@/features/shell/actions";
@@ -130,6 +133,7 @@ function SidebarNav({ nav, collapsed, onNavigate }: { nav: NavGroup[]; collapsed
 }
 
 function NotificationBell({ unread, items }: { unread: number; items: ShellNotification[] }) {
+  const t = useT();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [, start] = useTransition();
@@ -147,7 +151,7 @@ function NotificationBell({ unread, items }: { unread: number; items: ShellNotif
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[380px] p-0">
         <div className="flex items-center justify-between border-b px-4 py-3">
-          <div className="text-sm font-semibold">Notifications</div>
+          <div className="text-sm font-semibold">{t("Notifications")}</div>
           <Button
             variant="ghost"
             size="xs"
@@ -161,7 +165,7 @@ function NotificationBell({ unread, items }: { unread: number; items: ShellNotif
           </Button>
         </div>
         <ul className="max-h-[420px] overflow-y-auto py-1">
-          {items.length === 0 && <li className="px-4 py-10 text-center text-sm text-muted-foreground">You&apos;re all caught up.</li>}
+          {items.length === 0 && <li className="px-4 py-10 text-center text-sm text-muted-foreground">{t("You're all caught up.")}</li>}
           {items.map((n) => (
             <li key={n.id}>
               <button
@@ -191,7 +195,7 @@ function NotificationBell({ unread, items }: { unread: number; items: ShellNotif
         </ul>
         <div className="border-t p-2">
           <Button asChild variant="ghost" size="sm" className="w-full" onClick={() => setOpen(false)}>
-            <Link href="/notifications">View all notifications</Link>
+            <Link href="/notifications">{t("View all notifications")}</Link>
           </Button>
         </div>
       </PopoverContent>
@@ -207,6 +211,7 @@ export function AppShell({
   commands,
   demoMode,
   initialCollapsed,
+  locale = "en",
   children,
 }: {
   user: ShellUser;
@@ -216,8 +221,10 @@ export function AppShell({
   commands: PaletteCommand[];
   demoMode: boolean;
   initialCollapsed?: boolean;
+  locale?: Locale;
   children: React.ReactNode;
 }) {
+  const t = useT();
   const [collapsed, setCollapsed] = useState(!!initialCollapsed);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
@@ -263,7 +270,7 @@ export function AppShell({
         </div>
         <div className={cn("border-t p-3", collapsed && "flex justify-center")}>
           <Button variant="ghost" size={collapsed ? "icon" : "sm"} onClick={toggle} className={cn(!collapsed && "w-full justify-start text-muted-foreground")} aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}>
-            {collapsed ? <ChevronsRight /> : <><ChevronsLeft /> Collapse</>}
+            {collapsed ? <ChevronsRight /> : <><ChevronsLeft /> {t("Collapse")}</>}
           </Button>
         </div>
       </motion.aside>
@@ -292,15 +299,16 @@ export function AppShell({
             className="flex h-9 w-full min-w-0 max-w-md items-center gap-2 rounded-lg border bg-card/70 px-3 text-left text-sm text-muted-foreground shadow-[var(--shadow-soft)] transition-colors hover:border-primary/30"
           >
             <Search className="size-4 shrink-0" aria-hidden />
-            <span className="min-w-0 flex-1 truncate">Search papers, questions, courses…</span>
+            <span className="min-w-0 flex-1 truncate">{t("Search papers, questions, courses…")}</span>
             <kbd className="hidden rounded border bg-muted px-1.5 font-mono text-[10.5px] sm:inline">Ctrl K</kbd>
           </button>
           <div className="ml-auto flex shrink-0 items-center gap-1">
             {demoMode && (
               <span className="mr-2 hidden whitespace-nowrap rounded-full bg-tone-warning/10 px-2.5 py-1 text-[11px] font-semibold text-tone-warning ring-1 ring-tone-warning/25 md:inline">
-                Demo environment
+                {t("Demo environment")}
               </span>
             )}
+            <LanguageSwitcher current={locale} label={t("Language")} className="mr-1" />
             <Button variant="ghost" size="icon" onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")} aria-label="Toggle colour theme">
               <Sun className="hidden size-4.5 dark:block" aria-hidden />
               <Moon className="size-4.5 dark:hidden" aria-hidden />
@@ -324,14 +332,14 @@ export function AppShell({
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href="/profile"><UserRound /> Profile</Link>
+                  <Link href="/profile"><UserRound /> {t("Profile")}</Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/profile#security"><KeyRound /> Security & sessions</Link>
+                  <Link href="/profile#security"><KeyRound /> {t("Security & sessions")}</Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem variant="destructive" onSelect={() => void logoutAction()}>
-                  <LogOut /> Sign out
+                  <LogOut /> {t("Sign out")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

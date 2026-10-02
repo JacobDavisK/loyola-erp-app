@@ -1,4 +1,5 @@
 import "server-only";
+import { reentryWindow } from "@/server/services/nep";
 import { z } from "zod";
 import type { Prisma } from "@/generated/prisma/client";
 import { Gender, GuardianRelation, StudentStatus } from "@/generated/prisma/enums";
@@ -137,6 +138,11 @@ export async function requestStatusChange(ctx: AuthContext, id: string, raw: unk
   assertStudentPerm(ctx, "student.status", s.departmentId);
   const v = statusSchema.parse(raw);
   if (v.to === s.status) throw invalid("The student already has this status.");
+  if (v.to === "EXITED") throw invalid("Exits with an award are requested from the student's NEP tab.");
+  if (s.status === "EXITED" && v.to === "ACTIVE") {
+    const until = await reentryWindow(s.id);
+    if (!until || until < new Date()) throw invalid("The re-entry window for this student's exit award has closed.");
+  }
   const program = await db.program.findUniqueOrThrow({ where: { id: s.programId }, select: { code: true } });
   const data: StudentStatusData = {
     studentId: s.id, studentNo: s.studentNo, studentName: `${s.firstName} ${s.lastName}`, from: s.status, to: v.to, reason: v.reason,

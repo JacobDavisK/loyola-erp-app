@@ -1,5 +1,7 @@
 "use client";
 
+import { LanguageSwitcher } from "@/components/language-switcher";
+import { type Locale, translate } from "@/lib/i18n";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
@@ -21,7 +23,8 @@ const schema = z.object({
 });
 type Values = z.infer<typeof schema>;
 
-export function LoginForm({ demoUsers, notice }: { demoUsers: { email: string; name: string; role: string }[]; notice?: string }) {
+export function LoginForm({ demoUsers, notice, ssoError, providers = [], locale = "en" }: { demoUsers: { email: string; name: string; role: string }[]; notice?: string; ssoError?: string; providers?: { slug: string; label: string }[]; locale?: Locale }) {
+  const t = (x: string) => translate(locale, x);
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [show, setShow] = useState(false);
@@ -64,23 +67,23 @@ export function LoginForm({ demoUsers, notice }: { demoUsers: { email: string; n
         <div className="text-lg font-semibold tracking-[0.06em]">{BRAND.name}</div>
         <div className="text-xs text-muted-foreground">{BRAND.tagline}</div>
       </div>
-      <h2 className="text-2xl font-semibold tracking-tight">Sign in</h2>
-      <p className="mt-1.5 text-sm text-muted-foreground">Use your university e-mail or employee ID.</p>
+      <div className="flex items-start justify-between gap-3"><h2 className="text-2xl font-semibold tracking-tight">{t("Sign in")}</h2><LanguageSwitcher current={locale} label={t("Language")} /></div>
+      <p className="mt-1.5 text-sm text-muted-foreground">{t("Use your university e-mail or employee ID.")}</p>
 
       {notice && (
         <div role="status" className="mt-6 flex items-start gap-2 rounded-lg border bg-muted/50 px-3 py-2.5 text-sm">
           <Info className="mt-0.5 size-4 shrink-0 text-tone-info" /> {notice}
         </div>
       )}
-      {error && (
+      {(error || ssoError) && (
         <div role="alert" className="mt-6 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">
-          <AlertCircle className="mt-0.5 size-4 shrink-0" /> {error}
+          <AlertCircle className="mt-0.5 size-4 shrink-0" /> {error ?? ssoError}
         </div>
       )}
 
       <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
         <div className="space-y-1.5">
-          <Label htmlFor="identifier">E-mail or employee ID</Label>
+          <Label htmlFor="identifier">{t("E-mail or employee ID")}</Label>
           <Input
             id="identifier"
             autoComplete="username"
@@ -94,8 +97,8 @@ export function LoginForm({ demoUsers, notice }: { demoUsers: { email: string; n
         </div>
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
-            <Label htmlFor="password">Password</Label>
-            <Link href="/forgot-password" className="text-xs font-medium text-primary hover:underline">Forgot password?</Link>
+            <Label htmlFor="password">{t("Password")}</Label>
+            <Link href="/forgot-password" className="text-xs font-medium text-primary hover:underline">{t("Forgot password?")}</Link>
           </div>
           <div className="relative">
             <Input
@@ -115,13 +118,24 @@ export function LoginForm({ demoUsers, notice }: { demoUsers: { email: string; n
         </div>
         <label className="flex items-center gap-2 text-sm">
           <Checkbox checked={form.watch("remember")} onCheckedChange={(v) => form.setValue("remember", v === true)} />
-          Remember this device
+          {t("Remember this device")}
         </label>
         <Button type="submit" className="h-10 w-full" disabled={pending}>
           {pending && !demoPending ? <Loader2 className="animate-spin" /> : null}
-          Sign in <ArrowRight />
+          {t("Sign in")} <ArrowRight />
         </Button>
       </form>
+
+      {providers.length > 0 && (
+        <div className="mt-5 space-y-2">
+          <div className="flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />{t("or")}<span className="h-px flex-1 bg-border" /></div>
+          {providers.map((p) => (
+            <Button key={p.slug} asChild variant="outline" className="h-10 w-full">
+              <a href={`/api/auth/sso/${p.slug}${form.watch("remember") ? "?remember=1" : ""}`}>{t("Continue with")} {p.label}</a>
+            </Button>
+          ))}
+        </div>
+      )}
 
       <p className="mt-6 flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
         <Lock className="mt-0.5 size-3.5 shrink-0" />

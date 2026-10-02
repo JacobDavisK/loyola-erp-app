@@ -11,14 +11,16 @@ import { requirePageAuth } from "@/server/auth/current";
 import { db } from "@/server/db";
 import { getInstitution } from "@/server/services/directory";
 import { portalSubject } from "@/server/services/portal";
+import { getT } from "@/server/i18n";
 
 export const metadata: Metadata = { title: "Examinations" };
 
 export default async function PortalExamsPage({ searchParams }: { searchParams: Promise<{ student?: string }> }) {
   const ctx = await requirePageAuth("self.portal");
+  const t = await getT();
   const sp = await searchParams;
   const subject = await portalSubject(ctx, sp.student);
-  if (!subject.canAcademic) return <div><PageHeader title="Examinations" /><EmptyState icon={Ticket} title="Not shared with this account" /></div>;
+  if (!subject.canAcademic) return <div><PageHeader title={t("Examinations")} /><EmptyState icon={Ticket} title="Not shared with this account" /></div>;
   const inst = await getInstitution();
   const regs = await db.examRegistration.findMany({
     where: { studentId: subject.student.id, session: { status: { not: "ARCHIVED" } } },
@@ -29,7 +31,7 @@ export default async function PortalExamsPage({ searchParams }: { searchParams: 
   const sessions = [...new Map(regs.map((r) => [r.session.id, r.session])).values()];
   return (
     <div className="space-y-6">
-      <PageHeader title="Examinations" description={`${subject.student.firstName} ${subject.student.lastName} · eligibility, timetable, seat and hall ticket`} />
+      <PageHeader title={t("Examinations")} description={`${subject.student.firstName} ${subject.student.lastName} · eligibility, timetable, seat and hall ticket`} />
       {sessions.length === 0 && <EmptyState icon={Ticket} title="No examinations yet" description="When the examination cell confirms eligibility, your papers appear here." />}
       {sessions.map((s) => {
         const list = regs.filter((r) => r.session.id === s.id);

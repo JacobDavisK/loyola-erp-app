@@ -2,7 +2,7 @@ import {
   Activity, Archive, Bell, BookOpen, Building2, CalendarDays, CalendarRange, ChartLine, ClipboardList,
   FileBarChart, FileText, History, Inbox, LayoutDashboard, Library, ListChecks, Package, Palette, Ruler,
   ScanSearch, Settings, ShieldCheck, Stamp, Tags, UsersRound, Circle, GraduationCap, Upload, School, CalendarClock, Route, DoorOpen,
-  Presentation, Percent, ClipboardCheck, Ticket, Award, PenLine, RefreshCcw, Wallet, Banknote, Briefcase, CalendarOff, UserCheck, Contact, FlaskConical, BadgeCheck, Megaphone, LifeBuoy, BedDouble, Bus, UserPlus, type LucideIcon,
+  Presentation, Percent, ClipboardCheck, Ticket, Award, PenLine, RefreshCcw, Wallet, Banknote, Briefcase, CalendarOff, UserCheck, Contact, FlaskConical, BadgeCheck, Megaphone, LifeBuoy, BedDouble, Bus, UserPlus, Landmark, Target, LogOut, FileCheck, LockKeyhole, Bot, Scale, IdCard, HeartHandshake, ShoppingCart, Boxes, Monitor, PiggyBank, CalendarCheck, ShieldHalf, Stethoscope, DoorClosed, type LucideIcon,
 } from "lucide-react";
 
 const MAP: Record<string, LucideIcon> = {
@@ -15,6 +15,8 @@ const MAP: Record<string, LucideIcon> = {
   school: School, "calendar-clock": CalendarClock, route: Route, "door-open": DoorOpen, presentation: Presentation, percent: Percent,
   "clipboard-check": ClipboardCheck, ticket: Ticket, award: Award, "pen-line": PenLine, "refresh-ccw": RefreshCcw, wallet: Wallet, banknote: Banknote,
   briefcase: Briefcase, flask: FlaskConical, "badge-check": BadgeCheck, megaphone: Megaphone, "life-buoy": LifeBuoy, bed: BedDouble, bus: Bus, "user-plus": UserPlus, "calendar-off": CalendarOff, "user-check": UserCheck, contact: Contact,
+  landmark: Landmark, target: Target, "log-out": LogOut, "file-check": FileCheck, "lock-keyhole": LockKeyhole, bot: Bot, scale: Scale, "id-card": IdCard, "heart-handshake": HeartHandshake,
+  cart: ShoppingCart, boxes: Boxes, monitor: Monitor, "piggy-bank": PiggyBank, "calendar-check": CalendarCheck, shield: ShieldHalf, stethoscope: Stethoscope, "door-closed": DoorClosed,
 };
 
 export function NavIcon({ name, className }: { name: string; className?: string }) {

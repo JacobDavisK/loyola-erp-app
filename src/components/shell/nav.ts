@@ -30,6 +30,14 @@ export const NAV: NavGroup[] = [
       { label: "Notifications", href: "/notifications", icon: "bell" },
       { label: "Announcements", href: "/announcements", icon: "megaphone" },
       { label: "Helpdesk", href: "/helpdesk", icon: "life-buoy" },
+      { label: "Knowledge base", href: "/knowledge", icon: "book-open" },
+      { label: "Surveys", href: "/surveys", icon: "clipboard-check" },
+      { label: "Events & clubs", href: "/events", icon: "calendar-days" },
+      { label: "Grievances", href: "/grievances", icon: "scale" },
+      { label: "ID card", href: "/id-card", icon: "id-card" },
+      { label: "Notifications & messages", href: "/me/messages", icon: "bell" },
+      { label: "API & calendar", href: "/me/connect", icon: "calendar-check" },
+      { label: "Privacy & consent", href: "/me/privacy", icon: "lock-keyhole" },
     ],
   },
   {
@@ -43,6 +51,15 @@ export const NAV: NavGroup[] = [
       { label: "Fees", href: "/portal/fees", icon: "wallet", audience: "self", any: ["self.portal"] },
       { label: "Placements", href: "/portal/placements", icon: "briefcase", audience: "self", any: ["enrollment.self"] },
       { label: "Services & documents", href: "/portal/services", icon: "building-2", audience: "self", any: ["enrollment.self"] },
+      { label: "Credits & APAAR", href: "/portal/credits", icon: "landmark", audience: "self", any: ["enrollment.self"] },
+      { label: "Credential wallet", href: "/portal/wallet", icon: "wallet", audience: "self", any: ["enrollment.self"] },
+      { label: "Degree planner", href: "/portal/planner", icon: "route", audience: "self", any: ["enrollment.self"] },
+      { label: "Mentoring & support", href: "/portal/support", icon: "life-buoy", audience: "self", any: ["enrollment.self"] },
+      { label: "Assistant", href: "/portal/assistant", icon: "bot", audience: "self", any: ["enrollment.self"] },
+      { label: "Counselling", href: "/portal/counselling", icon: "heart-handshake", audience: "self", any: ["enrollment.self"] },
+      { label: "Convocation", href: "/portal/convocation", icon: "graduation-cap", audience: "self", any: ["enrollment.self"] },
+      { label: "Out-pass", href: "/portal/outpass", icon: "door-closed", audience: "self", any: ["enrollment.self"] },
+      { label: "Health record", href: "/portal/health", icon: "stethoscope", audience: "self", any: ["enrollment.self"] },
       { label: "Library", href: "/library", icon: "library", audience: "self", any: ["enrollment.self"] },
     ],
   },
@@ -62,6 +79,15 @@ export const NAV: NavGroup[] = [
       { label: "My teaching", href: "/teaching", icon: "presentation", any: ["attendance.take"], audience: "staff" },
       { label: "My exam duties", href: "/duties", icon: "shield-check", any: ["exam.duty"], audience: "staff" },
       { label: "Valuation", href: "/valuation", icon: "pen-line", any: ["valuation.perform"], audience: "staff" },
+    ],
+  },
+  {
+    label: "Student success",
+    items: [
+      { label: "Early warning & cases", href: "/success", icon: "activity", any: ["success.view", "attendance.take"], audience: "staff" },
+      { label: "Mentoring", href: "/mentoring", icon: "users-round", any: ["attendance.take", "mentoring.manage"], audience: "staff" },
+      { label: "Counselling desk", href: "/counselling", icon: "heart-handshake", any: ["counselling.provide", "counselling.manage"], audience: "staff" },
+      { label: "Convocation", href: "/convocation", icon: "graduation-cap", any: ["convocation.manage"], audience: "staff" },
     ],
   },
   {
@@ -93,6 +119,19 @@ export const NAV: NavGroup[] = [
       { label: "Scholarships", href: "/finance/scholarships", icon: "graduation-cap", any: ["scholarship.manage"], audience: "staff" },
       { label: "Fee setup", href: "/finance/setup", icon: "settings", any: ["fee.manage"], audience: "staff" },
       { label: "Ledger", href: "/finance/ledger", icon: "book-open", any: ["ledger.manage"], audience: "staff" },
+      { label: "Budgets", href: "/budgets", icon: "piggy-bank", any: ["budget.manage", "budget.view"], audience: "staff" },
+    ],
+  },
+  {
+    label: "Operations",
+    items: [
+      { label: "Purchasing", href: "/procurement", icon: "cart", any: ["procurement.request", "procurement.manage", "procurement.pay"], audience: "staff" },
+      { label: "Stores & inventory", href: "/inventory", icon: "boxes", any: ["inventory.manage"], audience: "staff" },
+      { label: "Asset register", href: "/assets", icon: "monitor", any: ["asset.manage"], audience: "staff" },
+      { label: "Room booking", href: "/facilities", icon: "calendar-check", audience: "staff" },
+      { label: "Visitors", href: "/visitors", icon: "door-closed", audience: "staff" },
+      { label: "Gate & out-passes", href: "/gate", icon: "shield", any: ["gate.manage", "hostel.manage"], audience: "staff" },
+      { label: "Health centre", href: "/health", icon: "stethoscope", any: ["health.manage"], audience: "staff" },
     ],
   },
   {
@@ -127,6 +166,17 @@ export const NAV: NavGroup[] = [
       { label: "Research", href: "/research", icon: "flask", any: ["research.view"], audience: "staff" },
       { label: "Publications", href: "/research/publications", icon: "book-open", any: ["research.view"], audience: "staff" },
       { label: "IQAC & accreditation", href: "/iqac", icon: "badge-check", any: ["iqac.view"], audience: "staff" },
+      { label: "Outcome-based education", href: "/obe", icon: "target", any: ["obe.view", "obe.manage"], audience: "staff" },
+    ],
+  },
+  {
+    label: "Regulatory",
+    items: [
+      { label: "ABC & NAD-DigiLocker", href: "/compliance/nad", icon: "landmark", any: ["apaar.manage"], audience: "staff" },
+      { label: "Badges & micro-credentials", href: "/credentials/badges", icon: "award", any: ["badge.manage"], audience: "staff" },
+      { label: "NEP entry & exit", href: "/academics/nep", icon: "log-out", any: ["nep.manage", "student.status"], audience: "staff" },
+      { label: "Credit transfer", href: "/academics/credit-transfer", icon: "file-check", any: ["credittransfer.review"], audience: "staff" },
+      { label: "Data protection", href: "/privacy", icon: "lock-keyhole", any: ["privacy.manage"], audience: "staff" },
     ],
   },
   {
@@ -183,7 +233,7 @@ export const NAV: NavGroup[] = [
     label: "System",
     items: [
       { label: "Templates & branding", href: "/templates", icon: "palette", any: ["admin.templates.manage"] },
-      { label: "Configuration centre", href: "/admin", icon: "settings", any: ["admin.users.manage", "admin.roles.manage", "admin.settings.manage", "admin.institution.manage", "workflow.manage", "system.health"] },
+      { label: "Configuration centre", href: "/admin", icon: "settings", any: ["admin.users.manage", "admin.roles.manage", "admin.settings.manage", "admin.institution.manage", "workflow.manage", "system.health", "lti.manage", "messaging.manage"] },
     ],
   },
 ];

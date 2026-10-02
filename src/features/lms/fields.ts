@@ -49,6 +49,7 @@ export function quizFields(modules: { id: string; title: string }[]): FormField[
     { name: "timeLimitMinutes", label: "Time limit (minutes)", type: "number", optional: true, min: 1 },
     { name: "maxAttempts", label: "Attempts allowed", type: "number", min: 1, max: 20 },
     { name: "reviewPolicy", label: "Students see", type: "select", options: [{ value: "AFTER_CLOSE", label: "Score and answers after the quiz closes" }, { value: "AFTER_SUBMIT", label: "Score and answers right after submitting" }, { value: "SCORE_ONLY", label: "Score only" }, { value: "NEVER", label: "Nothing" }] },
+    { name: "proctoring", label: "Proctoring", type: "select", options: [{ value: "NONE", label: "None" }, { value: "BASIC", label: "Record tab switches, full-screen exits, copy/paste" }, { value: "WEBCAM", label: "As above plus webcam pictures" }] },
     { name: "shuffleQuestions", label: "Shuffle question order per student", type: "checkbox" },
     { name: "isPublished", label: "Published", type: "checkbox" },
   ];

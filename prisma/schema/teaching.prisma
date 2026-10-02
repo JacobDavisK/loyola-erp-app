@@ -1,0 +1,253 @@
+// ───────────────────────── Teaching and assessment: timetable generation, QR self check-in, quiz proctoring,
+//                            similarity checking, LTI 1.3 tools and feedback surveys ─────────────────────────
+
+// ── Automatic timetable ──
+
+enum TimetableRunStatus {
+  DRAFT
+  APPLIED
+  DISCARDED
+}
+
+/// A proposed timetable produced by the scheduler. Reviewed, then applied as TimetableSlot rows.
+model TimetableRun {
+  id           String             @id @default(cuid())
+  termId       String
+  departmentId String?
+  status       TimetableRunStatus @default(DRAFT)
+  proposal     Json
+  unplaced     Json
+  stats        Json
+  createdById  String
+  createdAt    DateTime           @default(now())
+  appliedAt    DateTime?
+  term         AcademicTerm       @relation(fields: [termId], references: [id])
+
+  @@index([termId, createdAt])
+}
+
+// ── QR self check-in ──
+
+/// A teacher opens self check-in for a class meeting; students scan the rotating QR code on the screen.
+model CheckInWindow {
+  id              String        @id @default(cuid())
+  meetingId       String        @unique
+  openedById      String
+  opensAt         DateTime      @default(now())
+  closesAt        DateTime
+  /// Minutes after the class starts when check-ins are marked late
+  lateAfterMinutes Int          @default(10)
+  requireLocation Boolean       @default(false)
+  latitude        Float?
+  longitude       Float?
+  radiusMeters    Int?
+  secret          String
+  meeting         ClassMeeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  checkIns        CheckIn[]
+}
+
+model CheckIn {
+  id          String        @id @default(cuid())
+  windowId    String
+  studentId   String
+  deviceHash  String
+  latitude    Float?
+  longitude   Float?
+  accuracy    Float?
+  distanceM   Float?
+  late        Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  window      CheckInWindow @relation(fields: [windowId], references: [id], onDelete: Cascade)
+  student     Student       @relation(fields: [studentId], references: [id])
+
+  @@unique([windowId, studentId])
+  @@unique([windowId, deviceHash])
+}
+
+// ── Quiz proctoring ──
+
+enum ProctoringMode {
+  NONE
+  BASIC
+  WEBCAM
+}
+
+/// Browser events during a proctored attempt (tab switches, leaving full screen, copy/paste, webcam frames).
+model ProctorEvent {
+  id        String      @id @default(cuid())
+  attemptId String
+  kind      String
+  detail    String?
+  fileId    String?
+  at        DateTime    @default(now())
+  attempt   QuizAttempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@index([attemptId, at])
+}
+
+// ── Similarity (plagiarism) checks ──
+
+model SimilarityReport {
+  id           String     @id @default(cuid())
+  assignmentId String
+  computedById String
+  computedAt   DateTime   @default(now())
+  /// [{ submissionA, submissionB, score, sample }]
+  pairs        Json
+  /// submissions whose text could not be extracted (scanned PDFs, images)
+  unreadable   Json
+  threshold    Float
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@index([assignmentId, computedAt])
+}
+
+// ── LTI 1.3 (this system is the platform; external learning tools plug in) ──
+
+model LtiTool {
+  id              String    @id @default(cuid())
+  name            String
+  clientId        String    @unique
+  deploymentId    String
+  oidcLoginUrl    String
+  launchUrl       String
+  /// Allowed redirect URIs for the launch (the launch URL is always allowed)
+  redirectUris    String[]
+  jwksUrl         String
+  /// Whether names and e-mails are sent to the tool
+  sharePersonalData Boolean @default(false)
+  enabled         Boolean   @default(true)
+  createdById     String
+  createdAt       DateTime  @default(now())
+  links           LtiLink[]
+}
+
+/// A placement of a tool in a class (shown as a course item).
+model LtiLink {
+  id          String         @id @default(cuid())
+  toolId      String
+  offeringId  String
+  title       String
+  /// Custom parameters sent with the launch
+  custom      Json           @default("{}")
+  /// When set, the tool may post scores back (Assignment and Grade Services)
+  maxScore    Float?
+  createdById String
+  createdAt   DateTime       @default(now())
+  tool        LtiTool        @relation(fields: [toolId], references: [id])
+  offering    CourseOffering @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  launches    LtiLaunch[]
+  scores      LtiScore[]
+
+  @@index([offeringId])
+}
+
+/// One launch attempt: binds the browser session to the OIDC login the tool starts.
+model LtiLaunch {
+  id        String    @id @default(cuid())
+  linkId    String
+  userId    String
+  createdAt DateTime  @default(now())
+  usedAt    DateTime?
+  link      LtiLink   @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+/// Signing keys for id_tokens (RSA). The private key is stored encrypted.
+model LtiKey {
+  id         String   @id @default(cuid())
+  kid        String   @unique
+  privateKey String
+  publicJwk  Json
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+}
+
+/// Access tokens issued to tools (client-credentials grant), stored as hashes.
+model LtiToken {
+  id        String   @id @default(cuid())
+  clientId  String
+  tokenHash String   @unique
+  scopes    String[]
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model LtiScore {
+  id          String   @id @default(cuid())
+  linkId      String
+  studentId   String
+  scoreGiven  Float?
+  scoreMaximum Float
+  activityProgress String
+  gradingProgress  String
+  comment     String?
+  timestamp   DateTime
+  createdAt   DateTime @default(now())
+  link        LtiLink  @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  student     Student  @relation(fields: [studentId], references: [id])
+
+  @@index([linkId, studentId, timestamp])
+}
+
+// ── Feedback surveys (course exit, teacher feedback, NAAC student satisfaction, alumni, employers) ──
+
+enum SurveyKind {
+  COURSE_EXIT
+  TEACHER_FEEDBACK
+  STUDENT_SATISFACTION
+  ALUMNI
+  EMPLOYER
+  GENERAL
+}
+
+enum SurveyAudience {
+  CLASS
+  STUDENTS
+  STAFF
+  PUBLIC_LINK
+}
+
+enum SurveyStatus {
+  DRAFT
+  OPEN
+  CLOSED
+}
+
+model Survey {
+  id          String         @id @default(cuid())
+  title       String
+  kind        SurveyKind
+  audience    SurveyAudience
+  offeringId  String?
+  termId      String?
+  anonymous   Boolean        @default(true)
+  /// [{ id, type: LIKERT | CHOICE | TEXT, text, options?, outcomeId? }]
+  questions   Json
+  status      SurveyStatus   @default(DRAFT)
+  opensAt     DateTime
+  closesAt    DateTime
+  /// Public link token (hash) for PUBLIC_LINK surveys (alumni, employers)
+  publicTokenHash String?    @unique
+  createdById String
+  createdAt   DateTime       @default(now())
+  offering    CourseOffering? @relation(fields: [offeringId], references: [id], onDelete: Cascade)
+  responses   SurveyResponse[]
+
+  @@index([status, closesAt])
+  @@index([offeringId])
+}
+
+/// One response. Anonymous surveys keep only a keyed hash of the respondent, to stop duplicate answers.
+model SurveyResponse {
+  id             String   @id @default(cuid())
+  surveyId       String
+  respondentHash String
+  userId         String?
+  answers        Json
+  submittedAt    DateTime @default(now())
+  survey         Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
+
+  @@unique([surveyId, respondentHash])
+}

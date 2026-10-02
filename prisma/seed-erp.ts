@@ -9,6 +9,12 @@ import { seedHr } from "./seed-hr";
 import { seedLms } from "./seed-lms";
 import { seedQuality } from "./seed-quality";
 import { seedCampus } from "./seed-campus";
+import { seedCompliance } from "./seed-compliance";
+import { seedSuccess } from "./seed-success";
+import { seedTeaching } from "./seed-teaching";
+import { seedCredentials } from "./seed-credentials";
+import { seedCampusLife } from "./seed-campuslife";
+import { seedOperations } from "./seed-operations";
 
 export interface SeedContext {
   db: PrismaClient;
@@ -67,6 +73,15 @@ export async function seedErp(s: SeedContext) {
     ["helpdesk", "Asha Pillai", "EMP0404", "Helpdesk Executive", null, [{ role: "HELPDESK_AGENT" }]],
     ["admissions", "Vinod Kumar", "EMP0405", "Admissions Officer", null, [{ role: "ADMISSIONS_OFFICER" }]],
     ["placement", "Dr. Neha Joshi", "EMP0406", "Training & Placement Officer", null, [{ role: "PLACEMENT_OFFICER" }]],
+    ["dpo", "Adv. Sunita Rao", "EMP0407", "Data Protection Officer", null, [{ role: "DATA_PROTECTION_OFFICER" }]],
+    ["welfare", "Dr. Thomas Mathew", "EMP0408", "Dean of Student Welfare", null, [{ role: "DEAN_STUDENT_WELFARE" }]],
+    ["counsellor", "Ms. Anjali Verma", "EMP0409", "Student Counsellor", null, [{ role: "COUNSELLOR" }]],
+    ["ombudsperson", "Justice (Retd.) K. Raman", "EMP0410", "Ombudsperson", null, [{ role: "OMBUDSPERSON" }]],
+    ["purchase", "Ganesh Iyer", "EMP0411", "Purchase Officer", null, [{ role: "PURCHASE_OFFICER" }]],
+    ["stores", "Selvi Raj", "EMP0412", "Store Keeper", null, [{ role: "STORE_KEEPER" }]],
+    ["estate", "Er. Prakash Nair", "EMP0413", "Estate Officer", null, [{ role: "ESTATE_OFFICER" }]],
+    ["security", "Capt. (Retd.) Ramesh Singh", "EMP0414", "Chief Security Officer", null, [{ role: "SECURITY_OFFICER" }]],
+    ["doctor", "Dr. Kavitha Sundaram", "EMP0415", "Medical Officer", null, [{ role: "MEDICAL_OFFICER" }]],
   ];
   const campusIds: Record<string, string> = { MAIN: main.id, CITY: city.id };
   for (const [handle, name, emp, designation, d, grants] of staff) {
@@ -346,6 +361,12 @@ async function seedAcademicCore(s: SeedContext, campus: { main: string; city: st
   await seedLms(s, r);
   await seedQuality(s, r);
   await seedCampus(s, r);
+  await seedCompliance(s, r);
+  await seedSuccess(s, r);
+  await seedTeaching(s, r);
+  await seedCredentials(s);
+  await seedCampusLife(s);
+  await seedOperations(s);
 }
 
 // ───────────────────────── Phase 3: grading, valuers, marks, published history ─────────────────────────

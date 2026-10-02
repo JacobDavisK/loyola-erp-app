@@ -138,5 +138,16 @@ export async function degreeProgress(ctx: AuthContext, studentId: string) {
     };
     byCourse.set(r.offering.courseId, entry);
   }
-  return { curriculum: { id: curriculum.id, name: curriculum.name, version: curriculum.version }, audit: auditDegree(spec, [...byCourse.values()], cgpa), cgpa };
+  // Approved credit transfers (SWAYAM, MOOCs, other institutions): an equivalent course counts as passed;
+  // an unmapped one adds its credits (course type TRANSFER, usable in category requirements).
+  const external = await db.externalCredit.findMany({ where: { studentId, status: "APPROVED" }, include: { mappedCourse: { select: { code: true, courseType: true } } } });
+  for (const e of external) {
+    if (e.mappedCourseId && e.mappedCourse) {
+      if (!byCourse.get(e.mappedCourseId)?.passed) byCourse.set(e.mappedCourseId, { courseId: e.mappedCourseId, code: e.mappedCourse.code, credits: e.credits, courseType: e.mappedCourse.courseType, passed: true, attempts: 1 });
+      passed.add(e.mappedCourseId);
+    } else {
+      byCourse.set(`ext:${e.id}`, { courseId: `ext:${e.id}`, code: e.courseCode ?? e.source, credits: e.credits, courseType: "TRANSFER", passed: true, attempts: 1 });
+    }
+  }
+  return { curriculum: { id: curriculum.id, name: curriculum.name, version: curriculum.version }, audit: auditDegree(spec, [...byCourse.values()], cgpa), cgpa, transferCredits: external.reduce((a, e) => a + e.credits, 0) };
 }

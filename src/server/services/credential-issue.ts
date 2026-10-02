@@ -47,6 +47,7 @@ const SERIAL_PREFIX: Record<CredentialType, string> = {
   COURSE_COMPLETION: "CC/{YYYY}/",
   RANK_CERTIFICATE: "RC/{YYYY}/",
   TRANSFER_CERTIFICATE: "TC/{YYYY}/",
+  EXIT_CERTIFICATE: "EX/{YYYY}/",
 };
 
 export const CREDENTIAL_LABEL: Record<CredentialType, string> = {
@@ -59,10 +60,18 @@ export const CREDENTIAL_LABEL: Record<CredentialType, string> = {
   COURSE_COMPLETION: "Course completion certificate",
   RANK_CERTIFICATE: "Rank certificate",
   TRANSFER_CERTIFICATE: "Transfer certificate",
+  EXIT_CERTIFICATE: "Exit certificate (NEP multiple exit)",
 };
 
 /** Snapshot of everything printed on a credential. Built from published data only. */
-export async function buildPayload(tx: Tx, type: CredentialType, studentId: string, opts: { termId?: string | null; purpose?: string | null }) {
+export interface CredentialOptions {
+  termId?: string | null;
+  purpose?: string | null;
+  /** NEP exit award printed on an exit certificate */
+  award?: { title: string; level: number; credits: number } | null;
+}
+
+export async function buildPayload(tx: Tx, type: CredentialType, studentId: string, opts: CredentialOptions) {
   const s = await tx.student.findUniqueOrThrow({ where: { id: studentId }, include: { program: true, batch: true, department: true } });
   const inst = await tx.institution.findFirstOrThrow();
   const base = {
@@ -73,7 +82,7 @@ export async function buildPayload(tx: Tx, type: CredentialType, studentId: stri
     status: s.status,
     issuedOn: new Date().toISOString().slice(0, 10),
   };
-  if (type === "TRANSCRIPT" || type === "MARKSHEET" || type === "PROVISIONAL_CERTIFICATE" || type === "DEGREE_CERTIFICATE") {
+  if (type === "TRANSCRIPT" || type === "MARKSHEET" || type === "PROVISIONAL_CERTIFICATE" || type === "DEGREE_CERTIFICATE" || type === "EXIT_CERTIFICATE") {
     const results = await tx.courseResult.findMany({
       where: { studentId, isCurrent: true, publishedAt: { not: null }, ...(type === "MARKSHEET" && opts.termId ? { termId: opts.termId } : {}) },
       include: { course: { select: { code: true, title: true } }, run: { select: { term: { select: { id: true, name: true, startDate: true } } } } },
@@ -92,7 +101,10 @@ export async function buildPayload(tx: Tx, type: CredentialType, studentId: stri
       ...base,
       terms: [...byTerm.entries()].map(([termId, v]) => ({ ...v, sgpa: terms.find((x) => x.termId === termId)?.sgpa ?? null })),
       cgpa: lastTerm?.cgpa ?? null,
-      creditsEarned: lastTerm?.cumulativeCredits ?? null,
+      creditsEarned: type === "EXIT_CERTIFICATE" && opts.award ? opts.award.credits : lastTerm?.cumulativeCredits ?? null,
+      ...(type === "EXIT_CERTIFICATE" && opts.award
+        ? { award: opts.award, statement: `${base.student.name} (${base.student.studentNo}) has exited the ${base.programme.name} programme of ${base.institution.name} with the award of ${opts.award.title}, having earned ${opts.award.credits} credits.` }
+        : {}),
     };
   }
   return { ...base, purpose: opts.purpose ?? null, statement: certificateStatement(type, base) };
@@ -113,7 +125,7 @@ function certificateStatement(type: CredentialType, b: { student: { name: string
   }
 }
 
-export async function issueCredential(tx: Tx, actor: { id: string | null; name: string }, type: CredentialType, studentId: string, opts: { termId?: string | null; purpose?: string | null } = {}) {
+export async function issueCredential(tx: Tx, actor: { id: string | null; name: string }, type: CredentialType, studentId: string, opts: CredentialOptions = {}) {
   const payload = await buildPayload(tx, type, studentId, opts);
   const { contentHash, seal } = sealPayload(payload);
   // A newer transcript/marksheet supersedes the previous one of the same kind (the old one still verifies as superseded).
@@ -122,7 +134,11 @@ export async function issueCredential(tx: Tx, actor: { id: string | null; name: 
   const cred = await tx.issuedCredential.create({
     data: { type, serialNo, verificationCode: verificationCode(), studentId, title: CREDENTIAL_LABEL[type], payload: payload as Prisma.InputJsonValue, contentHash, seal, issuedById: actor.id },
   });
-  if (previous.length) await tx.issuedCredential.updateMany({ where: { id: { in: previous.map((p) => p.id) } }, data: { status: "SUPERSEDED", supersededById: cred.id } });
+  if (previous.length) {
+    await tx.issuedCredential.updateMany({ where: { id: { in: previous.map((p) => p.id) } }, data: { status: "SUPERSEDED", supersededById: cred.id } });
+    // Verifiable copies of a superseded transcript or mark sheet stop verifying; the new one can be issued.
+    await tx.verifiableCredential.updateMany({ where: { issuedCredentialId: { in: previous.map((p) => p.id) }, revokedAt: null }, data: { revokedAt: new Date() } });
+  }
   await audit({ actorId: actor.id, actorName: actor.name, action: "credential.issue", resourceType: "student", resourceId: studentId, summary: `${CREDENTIAL_LABEL[type]} ${serialNo}`, newValue: { credentialId: cred.id, contentHash } }, tx);
   await emitEvent(tx, { type: "CertificateIssued", aggregateType: "student", aggregateId: studentId, payload: { credentialId: cred.id, type }, actorId: actor.id });
   return cred;

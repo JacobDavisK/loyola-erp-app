@@ -4,14 +4,17 @@ import { NextResponse, type NextRequest } from "next/server";
  * Network-edge guard: cheap cookie presence check + CSRF origin check for mutating API calls.
  * Real session validation and authorisation happen on the server for every page, action and route.
  */
-const PUBLIC = ["/login", "/forgot-password", "/reset-password", "/api/health", "/verify", "/api/payments/webhook", "/apply"];
+const PUBLIC = ["/login", "/forgot-password", "/reset-password", "/api/health", "/verify", "/api/payments/webhook", "/apply", "/s", "/share", "/.well-known", "/manifest.webmanifest", "/sw.js", "/offline", "/id"];
 const COOKIES = ["examcore_session", "__Host-examcore_session"];
 
 export function proxy(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   // Signed server-to-server webhooks carry no browser Origin; they authenticate with the provider signature.
-  const signedWebhook = pathname === "/api/payments/webhook";
+  // LTI tools call the token and score endpoints server-to-server; they authenticate with signed JWTs / bearer tokens.
+  // The public API and the AI connector authenticate only with bearer tokens (never cookies), so cross-site requests gain nothing.
+  const bearerOnly = pathname.startsWith("/api/v1/") || pathname === "/api/mcp";
+  const signedWebhook = bearerOnly || pathname === "/api/payments/webhook" || pathname === "/api/messaging/whatsapp" || pathname === "/api/lti/token" || /^\/api\/lti\/lineitems\/[^/]+\/item\/scores$/.test(pathname);
   if (pathname.startsWith("/api/") && !signedWebhook && !["GET", "HEAD", "OPTIONS"].includes(req.method)) {
     const origin = req.headers.get("origin");
     const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");

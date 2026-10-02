@@ -10,7 +10,7 @@ function ctxFor(roleKey: keyof typeof SYSTEM_ROLES, dept: string | null = null, 
   for (const p of role.permissions) grants.set(p as never, role.global ? null : new Set(dept ? [dept] : []));
   return {
     sessionId: "s",
-    user: { id: userId, name: "Test", email: "t@x", employeeId: "E1", designation: null, departmentId: dept, departmentName: null, avatarAssetId: null, mfaEnabled: false, mustChangePassword: false, userType: "STAFF" },
+    user: { id: userId, name: "Test", email: "t@x", employeeId: "E1", designation: null, departmentId: dept, departmentName: null, avatarAssetId: null, mfaEnabled: false, mustChangePassword: false, userType: "STAFF", locale: "en" },
     roles: [{ key: roleKey, name: role.name, rank: role.rank, isGlobal: role.global, departmentId: dept, departmentName: null }],
     primaryRole: { key: roleKey, name: role.name, rank: role.rank, isGlobal: role.global, departmentId: dept, departmentName: null },
     subject: { studentId: null, wardStudentIds: [], employeeId: null },

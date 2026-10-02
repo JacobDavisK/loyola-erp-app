@@ -16,7 +16,7 @@ export interface StudentStatusData {
 }
 
 const LABEL: Record<string, string> = {
-  ACTIVE: "Active", ON_LEAVE: "On leave", SUSPENDED: "Suspended", WITHDRAWN: "Withdrawn", DISCONTINUED: "Discontinued", GRADUATED: "Graduated",
+  ACTIVE: "Active", ON_LEAVE: "On leave", SUSPENDED: "Suspended", WITHDRAWN: "Withdrawn", DISCONTINUED: "Discontinued", GRADUATED: "Graduated", EXITED: "Exited (NEP)",
 };
 
 registerWorkflow({

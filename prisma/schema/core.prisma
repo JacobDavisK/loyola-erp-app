@@ -299,6 +299,7 @@ model User {
   identities            UserIdentity[]
   apiTokens             ApiToken[]
   calendarFeed          CalendarFeed?
+  demoGrants            DemoGrant[]          @relation("DemoGrantAccount")
 
   @@index([departmentId])
   @@index([userType])
@@ -372,6 +373,8 @@ model Session {
   deviceLabel String?
   remember    Boolean   @default(false)
   mfaPending  Boolean   @default(false)
+  /// Set when the session was opened through a Demo Users grant (so revoking the grant ends it)
+  demoGrantId String?
   revokedAt   DateTime?
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 

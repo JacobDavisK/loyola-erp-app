@@ -109,7 +109,7 @@ export async function decideOutpass(ctx: AuthContext, id: string, approve: boole
   let guardianNotified = false;
   if (approve) {
     const g = s.guardians.find((x) => x.isPrimary && x.phone) ?? s.guardians.find((x) => x.phone);
-    const text = `Loyola University: ${s.firstName} ${s.lastName} has permission to leave the hostel for ${o.destination} from ${o.leaveAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} and must return by ${o.returnBy.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}.`.replace(/\s+/g, " ");
+    const text = `University of the World: ${s.firstName} ${s.lastName} has permission to leave the hostel for ${o.destination} from ${o.leaveAt.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })} and must return by ${o.returnBy.toLocaleString("en-IN", { timeZone: "Asia/Kolkata" })}.`.replace(/\s+/g, " ");
     if (g?.phone) guardianNotified = await sendDirectSms(g.phone, text, g.userId);
     await notify({ userIds: s.guardians.map((x) => x.userId), type: "gate.outpass", title: "Out-pass approved", body: text });
   }

@@ -2,6 +2,7 @@ import type { PermissionKey } from "@/lib/domain/permissions";
 
 export const ADMIN_TABS = [
   { key: "users", label: "Users", href: "/admin/users", perm: "admin.users.manage" },
+  { key: "demo-users", label: "Demo Users", href: "/admin/demo-users", perm: "demo.manage" },
   { key: "roles", label: "Roles & permissions", href: "/admin/roles", perm: "admin.roles.manage" },
   { key: "institution", label: "Institution & branding", href: "/admin/institution", perm: "admin.institution.manage" },
   { key: "workflows", label: "Workflows", href: "/admin/workflows", perm: "workflow.manage" },

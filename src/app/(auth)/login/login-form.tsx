@@ -8,13 +8,12 @@ import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { AlertCircle, ArrowRight, Eye, EyeOff, FlaskConical, Info, Loader2, Lock } from "lucide-react";
+import { AlertCircle, ArrowRight, Eye, EyeOff, Info, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { demoLoginAction, loginAction } from "@/features/auth/actions";
-import { BRAND } from "@/lib/brand";
+import { loginAction } from "@/features/auth/actions";
 
 const schema = z.object({
   identifier: z.string().trim().min(1, "Enter your e-mail or employee ID"),
@@ -23,13 +22,12 @@ const schema = z.object({
 });
 type Values = z.infer<typeof schema>;
 
-export function LoginForm({ demoUsers, notice, ssoError, providers = [], locale = "en" }: { demoUsers: { email: string; name: string; role: string }[]; notice?: string; ssoError?: string; providers?: { slug: string; label: string }[]; locale?: Locale }) {
+export function LoginForm({ notice, ssoError, providers = [], locale = "en" }: { notice?: string; ssoError?: string; providers?: { slug: string; label: string }[]; locale?: Locale }) {
   const t = (x: string) => translate(locale, x);
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [show, setShow] = useState(false);
   const [pending, start] = useTransition();
-  const [demoPending, setDemoPending] = useState<string | null>(null);
   const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { identifier: "", password: "", remember: false } });
 
   const onSubmit = form.handleSubmit((values) =>
@@ -47,28 +45,9 @@ export function LoginForm({ demoUsers, notice, ssoError, providers = [], locale 
     }),
   );
 
-  const demo = (email: string) => {
-    setDemoPending(email);
-    start(async () => {
-      const res = await demoLoginAction(email);
-      if (!res.ok) {
-        setError(res.error);
-        setDemoPending(null);
-        return;
-      }
-      router.replace("/dashboard");
-      router.refresh();
-    });
-  };
-
   return (
     <div>
-      <div className="mb-8 lg:hidden">
-        <div className="text-lg font-semibold tracking-[0.06em]">{BRAND.name}</div>
-        <div className="text-xs text-muted-foreground">{BRAND.tagline}</div>
-      </div>
-      <div className="flex items-start justify-between gap-3"><h2 className="text-2xl font-semibold tracking-tight">{t("Sign in")}</h2><LanguageSwitcher current={locale} label={t("Language")} /></div>
-      <p className="mt-1.5 text-sm text-muted-foreground">{t("Use your university e-mail or employee ID.")}</p>
+      <div className="flex items-start justify-between gap-3"><h2 className="text-[34px] leading-none">{t("Sign in")}</h2><LanguageSwitcher current={locale} label={t("Language")} /></div>
 
       {notice && (
         <div role="status" className="mt-6 flex items-start gap-2 rounded-lg border bg-muted/50 px-3 py-2.5 text-sm">
@@ -81,7 +60,7 @@ export function LoginForm({ demoUsers, notice, ssoError, providers = [], locale 
         </div>
       )}
 
-      <form onSubmit={onSubmit} className="mt-6 space-y-4" noValidate>
+      <form onSubmit={onSubmit} className="mt-8 space-y-6" noValidate>
         <div className="space-y-1.5">
           <Label htmlFor="identifier">{t("E-mail or employee ID")}</Label>
           <Input
@@ -120,8 +99,8 @@ export function LoginForm({ demoUsers, notice, ssoError, providers = [], locale 
           <Checkbox checked={form.watch("remember")} onCheckedChange={(v) => form.setValue("remember", v === true)} />
           {t("Remember this device")}
         </label>
-        <Button type="submit" className="h-10 w-full" disabled={pending}>
-          {pending && !demoPending ? <Loader2 className="animate-spin" /> : null}
+        <Button type="submit" className="h-11 w-full" disabled={pending}>
+          {pending ? <Loader2 className="animate-spin" /> : null}
           {t("Sign in")} <ArrowRight />
         </Button>
       </form>
@@ -137,36 +116,6 @@ export function LoginForm({ demoUsers, notice, ssoError, providers = [], locale 
         </div>
       )}
 
-      <p className="mt-6 flex items-start gap-2 text-xs leading-relaxed text-muted-foreground">
-        <Lock className="mt-0.5 size-3.5 shrink-0" />
-        Access is restricted to authorised students, staff and guardians. Sign-ins, downloads and approvals are recorded with device and network details.
-      </p>
-
-      {demoUsers.length > 0 && (
-        <div className="mt-8 rounded-xl border border-dashed p-4">
-          <div className="mb-3 flex items-center gap-2 text-xs font-semibold text-tone-warning">
-            <FlaskConical className="size-3.5" /> Demo mode — sign in as
-          </div>
-          <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2">
-            {demoUsers.map((u) => (
-              <button
-                key={u.email}
-                type="button"
-                disabled={pending}
-                onClick={() => demo(u.email)}
-                className="flex items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2 text-left transition-colors hover:border-primary/40 hover:bg-accent disabled:opacity-60"
-              >
-                <span className="min-w-0">
-                  <span className="block truncate text-[12.5px] font-medium">{u.role}</span>
-                  <span className="block truncate text-[11px] text-muted-foreground">{u.name}</span>
-                </span>
-                {demoPending === u.email && <Loader2 className="size-3.5 shrink-0 animate-spin" />}
-              </button>
-            ))}
-          </div>
-          <p className="mt-3 text-[11px] text-muted-foreground">Only available in development. Demo password for all accounts: <code className="font-mono">Examcore@2026</code></p>
-        </div>
-      )}
     </div>
   );
 }

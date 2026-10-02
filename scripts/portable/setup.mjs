@@ -3,6 +3,7 @@
  * Safe to run again: existing configuration and data are kept.
  */
 import { randomBytes } from "node:crypto";
+import readline from "node:readline";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { DATA_DIR, ENV_FILE, ROOT, fail, loadEnv, run, say, startDb } from "./common.mjs";
@@ -55,6 +56,49 @@ if (!existsSync(ENV_FILE)) {
 const cfg = loadEnv();
 Object.assign(process.env, cfg);
 
+// The Super Admin's own sign-in, chosen during installation. Only the name is stored; the password is
+// passed to the data loader once, which stores a hash, and is never written to disk in plain text.
+function ask(question, hidden = false) {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+    // Show a star for each character typed, including when the line is redrawn after a backspace.
+    if (hidden) rl._writeToOutput = (s) => {
+      const at = s.indexOf(question);
+      const mask = (t) => t.replace(/[^\r\n]/g, "*");
+      rl.output.write(at >= 0 ? s.slice(0, at + question.length) + mask(s.slice(at + question.length)) : mask(s));
+    };
+    rl.question(question, (answer) => { rl.close(); if (hidden) process.stdout.write("\n"); resolve(answer.trim()); });
+  });
+}
+function passwordProblem(pw) {
+  if (pw.length < 12) return "at least 12 characters";
+  if (!/[A-Z]/.test(pw)) return "a capital letter";
+  if (!/[a-z]/.test(pw)) return "a small letter";
+  if (!/[0-9]/.test(pw)) return "a digit";
+  return null;
+}
+async function chooseSuperAdmin() {
+  if (!process.stdin.isTTY) {
+    const pw = `${randomBytes(9).toString("base64url")}A1a`;
+    console.log(`  No keyboard available. Super Admin: sign in as "admin" with the password ${pw} and change it under Profile.`);
+    return { login: "admin", password: pw };
+  }
+  say("Choose the Super Admin's sign-in");
+  console.log("  The Super Admin can do everything in the system. Choose a name and a strong password, and keep them safe.");
+  let login = "";
+  while (!/^[A-Za-z][A-Za-z0-9._-]{2,39}$/.test(login)) {
+    login = await ask("  Sign-in name (letters, digits, . _ -; e.g. Jacob): ");
+    if (!/^[A-Za-z][A-Za-z0-9._-]{2,39}$/.test(login)) console.log("  Use 3–40 characters, starting with a letter.");
+  }
+  for (;;) {
+    const pw = await ask("  Password: ", true);
+    const problem = passwordProblem(pw);
+    if (problem) { console.log(`  The password needs ${problem}.`); continue; }
+    if ((await ask("  Type the password again: ", true)) !== pw) { console.log("  The two passwords are different. Try again."); continue; }
+    return { login, password: pw };
+  }
+}
+
 try {
   // 2. Dependencies
   if (!existsSync(path.join(ROOT, "node_modules", "next"))) {
@@ -75,8 +119,12 @@ try {
     say("Applying database migrations");
     await run("npx prisma migrate deploy");
     if (db.firstRun) {
+      const admin = await chooseSuperAdmin();
+      const envText = readFileSync(ENV_FILE, "utf8").replace(/^SUPER_ADMIN_LOGIN=.*\n?/m, "");
+      writeFileSync(ENV_FILE, `${envText.trimEnd()}\nSUPER_ADMIN_LOGIN="${admin.login}"\n`);
       say("Loading demo data");
-      await run("npx tsx prisma/seed.ts");
+      await run("npx tsx prisma/seed.ts", { SUPER_ADMIN_LOGIN: admin.login, SUPER_ADMIN_PASSWORD: admin.password });
+      console.log(`  Super Admin: sign in as "${admin.login}" with the password you chose.`);
     } else {
       console.log("  Existing data kept. To reset to the demo data, delete the .pgdata folder and run setup again.");
     }

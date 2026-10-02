@@ -12,7 +12,7 @@ export async function seedCompliance(s: SeedContext, r: () => number) {
   const day = 86_400_000;
   const now = s.now.getTime();
 
-  await db.systemSetting.upsert({ where: { key: "nep" }, create: { key: "nep", value: { externalCreditMaxPercent: 40, nadIssuerName: "Loyola University" } }, update: { value: { externalCreditMaxPercent: 40, nadIssuerName: "Loyola University" } } });
+  await db.systemSetting.upsert({ where: { key: "nep" }, create: { key: "nep", value: { externalCreditMaxPercent: 40, nadIssuerName: "University of the World" } }, update: { value: { externalCreditMaxPercent: 40, nadIssuerName: "University of the World" } } });
 
   // ── NEP multiple exit ──
   const awards: Record<string, [number, string, number, number][]> = {

@@ -8,6 +8,8 @@ const schema = z.object({
   DATA_ENCRYPTION_KEY: z.string().refine((v) => Buffer.from(v, "base64").length === 32, "DATA_ENCRYPTION_KEY must be 32 bytes, base64"),
   APP_URL: z.string().url().default("http://localhost:3000"),
   EXAMCORE_DEMO_MODE: z.string().optional(),
+  /** The Super Admin's own sign-in name, when one was chosen for this installation (its account is then never offered for demo sign-in). */
+  SUPER_ADMIN_LOGIN: z.string().optional(),
   STORAGE_DRIVER: z.enum(["local"]).default("local"),
   STORAGE_DIR: z.string().default("./storage"),
   EMAIL_DRIVER: z.enum(["outbox"]).default("outbox"),

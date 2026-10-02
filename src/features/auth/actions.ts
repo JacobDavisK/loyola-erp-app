@@ -7,7 +7,7 @@ import { readSession, destroyCurrentSession, revokeAllSessions } from "@/server/
 import { requireAuth } from "@/server/auth/current";
 import { runAction, type ActionResult } from "@/server/action";
 import { db } from "@/server/db";
-import { demoModeEnabled, env } from "@/server/env";
+import { env } from "@/server/env";
 import { forbidden, invalid } from "@/server/errors";
 import { decryptString, encryptString, randomToken, sha256 } from "@/server/security/crypto";
 import { checkPasswordPolicy, hashPassword, verifyPassword } from "@/server/security/password";
@@ -47,19 +47,6 @@ export async function verifyMfaAction(code: string): Promise<ActionResult<null>>
     const remember = (await db.session.findUniqueOrThrow({ where: { id: session.id } })).remember;
     await db.session.update({ where: { id: session.id }, data: { revokedAt: new Date() } });
     await completeLogin(user.id, user.name, remember, "password + MFA");
-    return null;
-  });
-}
-
-/** Development/demo only. Disabled whenever NODE_ENV=production, regardless of configuration. */
-export async function demoLoginAction(email: string): Promise<ActionResult<null>> {
-  return runAction(async () => {
-    if (!demoModeEnabled) throw forbidden("Demo sign-in is disabled.");
-    const user = await db.user.findFirst({
-      where: { AND: [{ email: String(email) }, { email: { endsWith: "@example.edu" } }], deletedAt: null, status: "ACTIVE" },
-    });
-    if (!user) throw invalid("Unknown demo account.");
-    await completeLogin(user.id, user.name, false, "demo selector");
     return null;
   });
 }

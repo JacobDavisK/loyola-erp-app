@@ -1,5 +1,5 @@
 /**
- * EXAMCORE demo seed — "Loyola University".
+ * EXAMCORE demo seed — "University of the World".
  * Development only: wipes and recreates all data. Refuses to run when NODE_ENV=production.
  */
 import "dotenv/config";
@@ -107,8 +107,8 @@ async function main() {
   console.log("› institution & academic structure");
   const inst = await db.institution.create({
     data: {
-      name: "Loyola University",
-      shortName: "LU",
+      name: "University of the World",
+      shortName: "UW",
       tagline: "Office of the Controller of Examinations",
       address: "University Road, Knowledge City — 600 001",
       phone: "+91 44 2345 6789",
@@ -152,9 +152,12 @@ async function main() {
   // ── Users ──────────────────────────────────────────────────
   console.log("› users");
   const passwordHash = await hash(DEMO_PASSWORD, { memoryCost: 19456, timeCost: 2, parallelism: 1, outputLen: 32 });
+  // The Super Admin's sign-in name and password can be set per installation in .env (never committed).
+  const adminLogin = process.env.SUPER_ADMIN_LOGIN?.trim() || "EMP1001";
+  const adminHash = process.env.SUPER_ADMIN_PASSWORD ? await hash(process.env.SUPER_ADMIN_PASSWORD, { memoryCost: 19456, timeCost: 2, parallelism: 1, outputLen: 32 }) : passwordHash;
   const users: Record<string, { id: string; name: string }> = {};
   const userSpec: [string, string, string, string, string | null, [SystemRoleKey, string | null][]][] = [
-    ["admin", "Rahul Menon", "EMP1001", "System Administrator", null, [["SUPER_ADMIN", null]]],
+    ["admin", "Rahul Menon", adminLogin, "System Administrator", null, [["SUPER_ADMIN", null]]],
     ["controller", "Dr. Meera Krishnan", "EMP1002", "Controller of Examinations", null, [["EXAM_CONTROLLER", null]]],
     ["deputy", "Dr. Arun Prakash", "EMP1003", "Deputy Controller of Examinations", null, [["DEPUTY_CONTROLLER", null]]],
     ["examcell", "Kavitha Suresh", "EMP1004", "Section Officer, Examination Cell", null, [["EXAM_CELL_STAFF", null]]],
@@ -180,8 +183,8 @@ async function main() {
         employeeId: emp,
         name,
         designation,
-        phone: `+91 98${emp.slice(3)}0 1${emp.slice(4)}`,
-        passwordHash,
+        phone: handle === "admin" ? "+91 9810010 1001" : `+91 98${emp.slice(3)}0 1${emp.slice(4)}`,
+        passwordHash: handle === "admin" ? adminHash : passwordHash,
         departmentId: d ? dept[d] : null,
         lastLoginAt: daysFromNow(-1),
         roles: { create: grants.map(([role, gd]) => ({ roleId: roleId[role], departmentId: gd ? dept[gd] : null })) },
@@ -369,7 +372,7 @@ async function main() {
       headerTitle: "EXAMPLE UNIVERSITY",
       headerSubtitle: "Office of the Controller of Examinations",
       instructions: "Answer the questions as directed in each section.\nWrite your register number on the question paper immediately after receiving it.\nUse of non-programmable scientific calculators is permitted.",
-      footerText: "Confidential — Loyola University Examination Cell",
+      footerText: "Confidential — University of the World Examination Cell",
       fontFamily: "Times New Roman",
       fontSizePt: 12,
       marginMm: 18,

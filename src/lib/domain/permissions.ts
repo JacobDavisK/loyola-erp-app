@@ -118,6 +118,7 @@ export const PERMISSIONS = {
   "events.manage": { module: "Campus life", description: "Create clubs and campus events and record participation" },
   "convocation.manage": { module: "Campus life", description: "Plan convocations: graduates, registration, seating, gowns and degrees" },
   "messaging.manage": { module: "Campus life", description: "See the SMS / WhatsApp message log and delivery status" },
+  "demo.manage": { module: "System", description: "Give people access to the demo accounts (Demo Users): enrol their e-mail and generate a password" },
   "integration.manage": { module: "System", description: "Configure single sign-on, webhooks to other systems, and see every API token" },
   // Operations
   "budget.manage": { module: "Operations", description: "Prepare and approve budgets; post depreciation" },

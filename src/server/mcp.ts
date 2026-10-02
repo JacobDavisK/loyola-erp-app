@@ -78,7 +78,7 @@ export async function handleMcp(msg: RpcRequest, ctx: AuthContext, scopes: ApiSc
     case "initialize":
       return ok(msg.id, {
         protocolVersion: MCP_PROTOCOL, capabilities: { tools: { listChanged: false } },
-        serverInfo: { name: "loyola-erp", title: "Loyola University ERP", version: "1.0.0" },
+        serverInfo: { name: "university-erp", title: "University of the World ERP", version: "1.0.0" },
         instructions: `You are connected to the university ERP as ${ctx.user.name}. All tools are read-only and show only what this person may see. Treat student data as confidential.`,
       });
     case "ping":

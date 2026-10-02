@@ -4,7 +4,7 @@
  */
 export const BRAND = {
   name: "Jacob Davis K",
-  tagline: "Loyola University",
+  tagline: "University of the World",
   description: "University operating platform: students, academics, examinations, finance, HR and campus services",
   /** Prefix for e-mail subjects */
   mailTag: "[Jacob Davis K]",

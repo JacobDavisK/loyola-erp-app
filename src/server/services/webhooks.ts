@@ -107,7 +107,7 @@ export async function deliverWebhooks(now = new Date(), fetcher: typeof fetch = 
       try {
         const res = await fetcher(d.endpoint.url, {
           method: "POST", redirect: "manual", signal: AbortSignal.timeout(10_000),
-          headers: { "Content-Type": "application/json", "User-Agent": "LoyolaERP-Webhooks/1", "X-ERP-Event": d.event, "X-ERP-Delivery": d.id, "X-ERP-Signature": signPayload(decryptString(d.endpoint.secretEnc), body, ts) },
+          headers: { "Content-Type": "application/json", "User-Agent": "UniversityERP-Webhooks/1", "X-ERP-Event": d.event, "X-ERP-Delivery": d.id, "X-ERP-Signature": signPayload(decryptString(d.endpoint.secretEnc), body, ts) },
           body,
         });
         status = res.status;

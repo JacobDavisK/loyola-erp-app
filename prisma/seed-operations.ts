@@ -157,7 +157,7 @@ export async function seedOperations(s: SeedContext) {
     await db.outpass.create({ data: { studentId: a, reason: "Sister's wedding", destination: "Madurai (home)", leaveAt: at(2, 11), returnBy: at(5, 13), status: "REQUESTED" } });
     await db.outpass.create({ data: { studentId: b, reason: "Weekend at home", destination: "Vellore (home)", leaveAt: at(1, 11), returnBy: at(3, 14), status: "APPROVED", decidedById: u.warden.id, decidedAt: at(0, 4), guardianNotified: true } });
     await db.outpass.create({ data: { studentId: c, reason: "Dental appointment", destination: "Apollo Dental, T. Nagar", leaveAt: at(0, 3), returnBy: new Date(now - 30 * 60_000), status: "OUT", decidedById: u.warden.id, decidedAt: at(-1, 10), guardianNotified: true, outAt: at(0, 3, 10) } });
-    await db.outpass.create({ data: { studentId: d, reason: "Inter-collegiate cricket match", destination: "Loyola College ground", leaveAt: at(-6, 2), returnBy: at(-6, 14), status: "RETURNED", decidedById: u.warden.id, decidedAt: at(-7, 9), guardianNotified: true, outAt: at(-6, 2, 5), inAt: at(-6, 15, 40), late: true } });
+    await db.outpass.create({ data: { studentId: d, reason: "Inter-collegiate cricket match", destination: "University sports ground", leaveAt: at(-6, 2), returnBy: at(-6, 14), status: "RETURNED", decidedById: u.warden.id, decidedAt: at(-7, 9), guardianNotified: true, outAt: at(-6, 2, 5), inAt: at(-6, 15, 40), late: true } });
   }
 
   // Health-centre visits over the last month.

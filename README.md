@@ -1,4 +1,4 @@
-# Jacob Davis K — Loyola University platform
+# Jacob Davis K — University of the World platform
 
 **University ERP platform**: student information, academics, examinations and confidential question papers, results and credentials, learning management, finance, HR and payroll, research and accreditation, campus services, admissions and careers, reporting and analytics, all in one application with one security model.
 
@@ -57,7 +57,7 @@ Set `DATABASE_URL` to any PostgreSQL 14+ database whose role may create the `pg_
 
 `npm run db:seed` **wipes and recreates** demo data. It refuses to run when `NODE_ENV=production`.
 
-- **Loyola University:** 5 departments, 7 programmes and 20 courses with units, outcomes and blueprints.
+- **University of the World:** 5 departments, 7 programmes and 20 courses with units, outcomes and blueprints.
 - **Question bank:** 193 questions (MCQ, short/long answer, numerical, case study…) with maths and version history.
 - **Archive:** the archived April 2026 session, providing usage history for reuse checks.
 - **November 2026 session:** papers already in several states (draft, submitted, under scrutiny, awaiting approval) plus overdue and upcoming setter assignments.

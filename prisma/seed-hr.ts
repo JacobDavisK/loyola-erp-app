@@ -48,7 +48,7 @@ export async function seedHr(s: SeedContext, r: () => number) {
         category: teaching ? "TEACHING" : "NON_TEACHING", employmentType: h === "setter2" ? "PROBATION" : "PERMANENT", departmentId: u.departmentId,
         positionId: h === "hod.cs" ? P.prof : h.startsWith("faculty.cs") || h === "setter2" ? P.asst : h === "faculty.com1" ? P.apCom : !teaching ? P.admin : null,
         designation: u.designation ?? "Staff", joinDate: d(`20${10 + Math.floor(r() * 14)}-0${1 + Math.floor(r() * 8)}-01`),
-        qualifications: teaching ? [{ degree: "Ph.D.", institution: "Loyola University", year: 2012 }] : undefined,
+        qualifications: teaching ? [{ degree: "Ph.D.", institution: "University of the World", year: 2012 }] : undefined,
       },
     });
     emp[h] = { id: e.id, basic, teaching };

@@ -51,5 +51,5 @@ export async function feedByToken(token: string): Promise<string | null> {
   if (!f || f.user.status !== "ACTIVE" || f.user.deletedAt) return null;
   const ctx = await buildAuthContext(f.userId, `calendar:${f.id}`);
   if (!ctx) return null;
-  return buildIcs(`Loyola University — ${f.user.name}`, await calendarFor(ctx));
+  return buildIcs(`University of the World — ${f.user.name}`, await calendarFor(ctx));
 }

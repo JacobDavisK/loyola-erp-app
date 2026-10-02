@@ -14,7 +14,7 @@ export function GET() {
   const paging = [{ name: "limit", description: "1–100, default 25" }, { name: "offset", description: "Rows to skip" }];
   const doc = {
     openapi: "3.1.0",
-    info: { title: "Loyola University ERP API", version: "1.0.0", description: `Read access for other systems and AI tools. Create a personal access token under Profile → API tokens and send it as \`Authorization: Bearer ecp_…\`. A token acts as its owner, limited to its scopes:\n\n${Object.entries(API_SCOPES).map(([k, v]) => `- \`${k}\`: ${v}`).join("\n")}` },
+    info: { title: "University of the World ERP API", version: "1.0.0", description: `Read access for other systems and AI tools. Create a personal access token under Profile → API tokens and send it as \`Authorization: Bearer ecp_…\`. A token acts as its owner, limited to its scopes:\n\n${Object.entries(API_SCOPES).map(([k, v]) => `- \`${k}\`: ${v}`).join("\n")}` },
     servers: [{ url: `${env.APP_URL}/api/v1` }],
     components: { securitySchemes: { token: { type: "http", scheme: "bearer", description: "Personal access token (ecp_…)" } } },
     paths: {

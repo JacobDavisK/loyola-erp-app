@@ -101,7 +101,7 @@ export async function seedFinance(s: SeedContext, term: { id: string; name: stri
   });
   await db.scholarshipScheme.create({
     data: {
-      code: "MERIT-2026", name: "Merit scholarship 2026–27", sponsor: "Loyola University Endowment", description: "For students with a strong academic record and no outstanding failures.",
+      code: "MERIT-2026", name: "Merit scholarship 2026–27", sponsor: "University of the World Endowment", description: "For students with a strong academic record and no outstanding failures.",
       percent: 25, seats: 20, status: "OPEN", opensAt: new Date("2026-08-01"), closesAt: new Date("2026-12-31"), criteria: { minCgpa: 6.5, minAttendancePercent: 75, noFailures: true },
     },
   });

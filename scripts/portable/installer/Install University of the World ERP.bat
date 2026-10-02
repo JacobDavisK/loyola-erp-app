@@ -1,5 +1,5 @@
 @echo off
-title Loyola University ERP - Installer
+title University of the World ERP - Installer
 set "SELF=%~f0"
 powershell -NoProfile -ExecutionPolicy Bypass -Command "$s=[IO.File]::ReadAllText($env:SELF); Invoke-Expression $s.Substring($s.LastIndexOf('#'+'PS-BEGIN'))"
 echo.
@@ -12,7 +12,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-$Root = Join-Path $env:LOCALAPPDATA 'LoyolaERP'
+$Root = Join-Path $env:LOCALAPPDATA 'UniversityOfTheWorldERP'
 $Node = Join-Path $Root 'tools\node'
 $App = Join-Path $Root 'app'
 $Tar = Join-Path $env:SystemRoot 'System32\tar.exe'
@@ -34,7 +34,7 @@ function Unpack($zip, $dest) {
 }
 
 try {
-  Write-Host 'Loyola University ERP (Jacob Davis K)' -ForegroundColor Green
+  Write-Host 'University of the World ERP (Jacob Davis K)' -ForegroundColor Green
   Write-Host 'First-time installation: 10 to 30 minutes, about 600 MB of downloads. Keep this window open.'
   if (-not [Environment]::Is64BitOperatingSystem) { throw 'A 64-bit edition of Windows 10 or 11 is required.' }
   if (-not (Test-Path $Tar)) { throw 'Windows 10 (version 1803 or newer) or Windows 11 is required.' }
@@ -64,14 +64,14 @@ try {
   $start = Join-Path $Root 'Start.cmd'
   Set-Content -Path $start -Encoding ASCII -Value @(
     '@echo off',
-    'title Loyola University ERP',
+    'title University of the World ERP',
     'set "PATH=%~dp0tools\node;%PATH%"',
     'cd /d "%~dp0app"',
     'node scripts\portable\start.mjs',
     'if errorlevel 1 pause'
   )
   $shell = New-Object -ComObject WScript.Shell
-  $link = $shell.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'Loyola University ERP.lnk'))
+  $link = $shell.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'University of the World ERP.lnk'))
   $link.TargetPath = $start
   $link.WorkingDirectory = $Root
   $link.IconLocation = "$env:SystemRoot\System32\imageres.dll,109"
@@ -79,8 +79,8 @@ try {
 
   Write-Host ''
   Write-Host 'Installed. Starting the application; the browser opens by itself.' -ForegroundColor Green
-  Write-Host 'Next time, use the "Loyola University ERP" shortcut on the desktop.'
-  Write-Host 'Sign in with  admin@example.edu  and the password  Examcore@2026'
+  Write-Host 'Next time, use the "University of the World ERP" shortcut on the desktop.'
+  Write-Host 'Sign in as the Super Admin with the name and password you chose during setup.'
   Start-Process -FilePath $start -WorkingDirectory $Root
 } catch {
   Write-Host ''

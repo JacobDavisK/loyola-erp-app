@@ -29,11 +29,11 @@ describe("single sign-on checks", () => {
     expect(expectedIssuer("https://accounts.google.com", {})).toBe("https://accounts.google.com");
   });
   it("needs a verified e-mail and an allowed domain", () => {
-    expect(idTokenEmail("GOOGLE", { email: "A@Loyola.edu", email_verified: true })).toBe("a@loyola.edu");
-    expect(idTokenEmail("GOOGLE", { email: "a@loyola.edu", email_verified: false })).toBeNull();
-    expect(idTokenEmail("MICROSOFT", { preferred_username: "b@loyola.edu" })).toBe("b@loyola.edu");
-    expect(domainAllowed("a@loyola.edu", ["loyola.edu"])).toBe(true);
-    expect(domainAllowed("a@evil-loyola.edu", ["loyola.edu"])).toBe(false);
+    expect(idTokenEmail("GOOGLE", { email: "A@World.edu", email_verified: true })).toBe("a@world.edu");
+    expect(idTokenEmail("GOOGLE", { email: "a@world.edu", email_verified: false })).toBeNull();
+    expect(idTokenEmail("MICROSOFT", { preferred_username: "b@world.edu" })).toBe("b@world.edu");
+    expect(domainAllowed("a@world.edu", ["world.edu"])).toBe(true);
+    expect(domainAllowed("a@evil-world.edu", ["world.edu"])).toBe(false);
     expect(domainAllowed("a@x.com", [])).toBe(true);
   });
 });

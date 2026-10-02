@@ -102,3 +102,21 @@ model CalendarFeed {
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+/// Access to a demo account for one person: they sign in with their own e-mail and a generated password,
+/// and act as the demo account. The Super Admin grants, resets and revokes these. Only a hash is stored.
+model DemoGrant {
+  id           String    @id @default(cuid())
+  demoUserId   String
+  email        String    @unique
+  name         String?
+  passwordHash String
+  expiresAt    DateTime?
+  revokedAt    DateTime?
+  lastUsedAt   DateTime?
+  createdById  String
+  createdAt    DateTime  @default(now())
+  demoUser     User      @relation("DemoGrantAccount", fields: [demoUserId], references: [id], onDelete: Cascade)
+
+  @@index([demoUserId])
+}

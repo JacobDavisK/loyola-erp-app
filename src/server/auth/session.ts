@@ -10,7 +10,7 @@ import { getSetting } from "@/server/services/settings";
 /** In production the __Host- prefix pins the cookie to this origin, HTTPS and path "/". */
 export const SESSION_COOKIE = env.NODE_ENV === "production" ? "__Host-examcore_session" : "examcore_session";
 
-export async function createSession(userId: string, opts: { remember: boolean; mfaPending: boolean }) {
+export async function createSession(userId: string, opts: { remember: boolean; mfaPending: boolean; demoGrantId?: string | null }) {
   const security = await getSetting("security");
   const meta = await requestMeta();
   const token = randomToken(32);
@@ -26,6 +26,7 @@ export async function createSession(userId: string, opts: { remember: boolean; m
       deviceLabel: describeDevice(meta.userAgent),
       remember: opts.remember,
       mfaPending: opts.mfaPending,
+      demoGrantId: opts.demoGrantId ?? null,
     },
   });
   const jar = await cookies();

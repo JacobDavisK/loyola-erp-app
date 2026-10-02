@@ -121,7 +121,7 @@ function fold(line: string): string {
 }
 
 export function buildIcs(name: string, events: CalendarEvent[], now = new Date()): string {
-  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Loyola University//ERP//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", `X-WR-CALNAME:${esc(name)}`, "REFRESH-INTERVAL;VALUE=DURATION:PT6H", "X-PUBLISHED-TTL:PT6H"];
+  const lines = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//University of the World//ERP//EN", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", `X-WR-CALNAME:${esc(name)}`, "REFRESH-INTERVAL;VALUE=DURATION:PT6H", "X-PUBLISHED-TTL:PT6H"];
   for (const e of events) {
     lines.push("BEGIN:VEVENT", `UID:${e.uid}`, `DTSTAMP:${icsDate(now)}`);
     if (e.allDay) lines.push(`DTSTART;VALUE=DATE:${icsDay(e.startsAt)}`, `DTEND;VALUE=DATE:${icsDay(new Date(Math.max(e.endsAt.getTime(), e.startsAt.getTime() + 86_400_000)))}`);

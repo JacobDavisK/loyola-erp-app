@@ -6,6 +6,7 @@ import { requestMeta } from "@/server/request-context";
 import { hashPassword, verifyPassword } from "@/server/security/password";
 import { hit } from "@/server/security/rate-limit";
 import { audit } from "@/server/services/audit";
+import { findDemoGrant } from "@/server/services/demo-access";
 import { getSetting } from "@/server/services/settings";
 
 let dummyHash: string | null = null;
@@ -44,8 +45,20 @@ export async function authenticate(identifier: string, password: string, remembe
     db.loginAttempt.create({ data: { identifier: id, ip: meta.ip, userAgent: meta.userAgent, success, reason } });
 
   if (!user) {
-    await verifyPassword(await getDummyHash(), password);
-    await record(false, "unknown_user");
+    // A person given access to a demo account signs in with their own e-mail (see Demo Users).
+    const grant = await findDemoGrant(id);
+    if (grant && grant.demoUser.status === "ACTIVE" && !grant.demoUser.deletedAt && (await verifyPassword(grant.passwordHash, password))) {
+      await record(true, "demo_access");
+      await db.demoGrant.update({ where: { id: grant.id }, data: { lastUsedAt: new Date() } });
+      if (grant.demoUser.mfaEnabled) {
+        await createSession(grant.demoUserId, { remember, mfaPending: true, demoGrantId: grant.id });
+        return { status: "mfa" };
+      }
+      await completeLogin(grant.demoUserId, grant.demoUser.name, remember, `demo access for ${grant.email}`, grant.id);
+      return { status: "ok" };
+    }
+    if (!grant) await verifyPassword(await getDummyHash(), password);
+    await record(false, grant ? "demo_bad_password" : "unknown_user");
     await audit({ action: "auth.login.failed", resourceType: "auth", summary: "Unknown identifier", metadata: { identifier: id } });
     return { status: "invalid" };
   }
@@ -89,8 +102,8 @@ export async function authenticate(identifier: string, password: string, remembe
   return { status: "ok" };
 }
 
-export async function completeLogin(userId: string, name: string, remember: boolean, method = "password") {
-  await createSession(userId, { remember, mfaPending: false });
+export async function completeLogin(userId: string, name: string, remember: boolean, method = "password", demoGrantId: string | null = null) {
+  await createSession(userId, { remember, mfaPending: false, demoGrantId });
   await db.user.update({ where: { id: userId }, data: { lastLoginAt: new Date() } });
   await audit({ actorId: userId, actorName: name, action: "auth.login", resourceType: "user", resourceId: userId, summary: `Signed in (${method})` });
 }

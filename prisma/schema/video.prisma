@@ -1,0 +1,310 @@
+// ───────────────────────── University Video & Collaboration ─────────────────────────
+// Meetings run on OpenVidu (LiveKit protocol). The ERP is the source of truth for who may join, roles,
+// attendance and recordings; OpenVidu only carries the media. Audit trail: the ERP's tamper-evident
+// AuditLog (resourceType "videoMeeting" / "videoRecording"), not a separate table.
+
+enum VideoMeetingType {
+  ONLINE_CLASS
+  FACULTY_MEETING
+  DEPARTMENT_MEETING
+  STUDENT_MENTORING
+  PARENT_MEETING
+  VIVA_VOCE
+  PHD_REVIEW
+  RESEARCH_MEETING
+  WEBINAR
+  GUEST_LECTURE
+  WORKSHOP
+  PLACEMENT_INTERVIEW
+  ADMISSION_INTERVIEW
+  EXAMINATION_MEETING
+  ADMINISTRATIVE_MEETING
+  GENERAL_MEETING
+}
+
+enum VideoMeetingStatus {
+  DRAFT
+  SCHEDULED
+  STARTING
+  LIVE
+  ENDED
+  CANCELLED
+  FAILED
+}
+
+/// Who besides the invited participants may find and join the meeting.
+enum VideoMeetingVisibility {
+  INVITED
+  COURSE
+  DEPARTMENT
+  INSTITUTION
+}
+
+enum VideoParticipantRole {
+  HOST
+  CO_HOST
+  PRESENTER
+  PARTICIPANT
+  MODERATOR
+  OBSERVER
+}
+
+enum VideoInvitationStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  TENTATIVE
+}
+
+enum VideoConnectionStatus {
+  INVITED
+  IN_LOBBY
+  ADMITTED
+  CONNECTED
+  DISCONNECTED
+  REMOVED
+}
+
+enum VideoAttendanceStatus {
+  PRESENT
+  PARTIALLY_PRESENT
+  ABSENT
+}
+
+enum VideoRecordingStatus {
+  STARTING
+  ACTIVE
+  PROCESSING
+  AVAILABLE
+  FAILED
+  ARCHIVED
+  DELETED
+}
+
+/// Who may watch a recording (always evaluated on the server).
+enum VideoRecordingAccess {
+  HOST_ONLY
+  PARTICIPANTS
+  COURSE
+  DEPARTMENT
+  SPECIFIC
+  ADMINS
+}
+
+model VideoMeeting {
+  id                 String                 @id @default(cuid())
+  /// Human-friendly identifier, e.g. ERP-ACD-2026-000184
+  publicId           String                 @unique
+  title              String
+  description        String?
+  meetingType        VideoMeetingType
+  hostUserId         String
+  departmentId       String?
+  /// LMS link: the course offering (class) this meeting belongs to
+  offeringId         String?
+  courseId           String?
+  batchId            String?
+  programId          String?
+  academicYearId     String?
+  /// Timetable link: the scheduled class session this meeting runs online
+  classMeetingId     String?                @unique
+  /// Mentoring link: the mentee
+  mentoringStudentId String?
+  scheduledStart     DateTime
+  scheduledEnd       DateTime
+  actualStart        DateTime?
+  actualEnd          DateTime?
+  timezone           String
+  status             VideoMeetingStatus     @default(SCHEDULED)
+  visibility         VideoMeetingVisibility @default(INVITED)
+  lobbyEnabled       Boolean                @default(false)
+  recordingEnabled   Boolean                @default(false)
+  autoRecord         Boolean                @default(false)
+  chatEnabled        Boolean                @default(true)
+  screenShareEnabled Boolean                @default(true)
+  /// Participants may unmute / turn on camera themselves (otherwise only presenters and hosts publish)
+  participantsCanPublish Boolean            @default(true)
+  participantLimit   Int
+  recordingAccess    VideoRecordingAccess   @default(PARTICIPANTS)
+  /// Provider room name (random, never derived from user input; not shown to users)
+  roomName           String                 @unique
+  reminderSentAt     DateTime?
+  cancelledAt        DateTime?
+  cancelReason       String?
+  failureReason      String?
+  createdById        String
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+  host               User                   @relation("VideoMeetingHost", fields: [hostUserId], references: [id])
+  department         Department?            @relation(fields: [departmentId], references: [id])
+  offering           CourseOffering?        @relation(fields: [offeringId], references: [id])
+  classMeeting       ClassMeeting?          @relation(fields: [classMeetingId], references: [id])
+  participants       VideoMeetingParticipant[]
+  presence           VideoPresence[]
+  attendance         VideoMeetingAttendance[]
+  recordings         VideoMeetingRecording[]
+  chat               VideoChatMessage[]
+  notes              VideoMeetingNote[]
+  guests             VideoMeetingGuest[]
+
+  @@index([status, scheduledStart])
+  @@index([hostUserId, scheduledStart])
+  @@index([offeringId, scheduledStart])
+  @@index([departmentId, scheduledStart])
+}
+
+/// An invited (or self-joined) participant. The invitation lives on this row (one per person per meeting).
+model VideoMeetingParticipant {
+  id               String                @id @default(cuid())
+  meetingId        String
+  userId           String?
+  guestId          String?               @unique
+  displayName      String
+  role             VideoParticipantRole  @default(PARTICIPANT)
+  /// Viva / PhD panels: CANDIDATE, INTERNAL_EXAMINER, EXTERNAL_EXAMINER, SUPERVISOR, CO_SUPERVISOR, COMMITTEE_MEMBER, EXTERNAL_EXPERT, CHAIR
+  panelRole        String?
+  invitationStatus VideoInvitationStatus @default(PENDING)
+  invitedAt        DateTime              @default(now())
+  respondedAt      DateTime?
+  connectionStatus VideoConnectionStatus @default(INVITED)
+  lobbyRequestedAt DateTime?
+  lastJoinedAt     DateTime?
+  lastLeftAt       DateTime?
+  removedAt        DateTime?
+  removedById      String?
+  createdAt        DateTime              @default(now())
+  meeting          VideoMeeting          @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  user             User?                 @relation("VideoParticipantUser", fields: [userId], references: [id])
+
+  @@unique([meetingId, userId])
+  @@index([userId])
+}
+
+/// One connection interval, from OpenVidu participant_joined / participant_left webhooks. Attendance is the
+/// union of a person's intervals, so reconnects and duplicate events never double-count.
+model VideoPresence {
+  id            String       @id @default(cuid())
+  meetingId     String
+  participantId String
+  /// Provider connection id (ParticipantInfo.sid), unique per connection
+  connectionSid String       @unique
+  joinedAt      DateTime
+  leftAt        DateTime?
+  meeting       VideoMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@index([participantId])
+}
+
+model VideoMeetingAttendance {
+  id                   String                @id @default(cuid())
+  meetingId            String
+  participantId        String                @unique
+  userId               String?
+  firstJoinedAt        DateTime?
+  lastLeftAt           DateTime?
+  totalSeconds         Int                   @default(0)
+  attendancePercentage Float                 @default(0)
+  attendanceStatus     VideoAttendanceStatus
+  manuallyAdjusted     Boolean               @default(false)
+  adjustedById         String?
+  adjustmentReason     String?
+  computedAt           DateTime              @default(now())
+  meeting              VideoMeeting          @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@index([meetingId])
+  @@index([userId])
+}
+
+model VideoMeetingRecording {
+  id                  String               @id @default(cuid())
+  meetingId           String
+  /// Provider egress id
+  providerRecordingId String               @unique
+  storageProvider     String
+  storagePath         String?
+  durationSeconds     Int?
+  fileSize            BigInt?
+  status              VideoRecordingStatus @default(STARTING)
+  access              VideoRecordingAccess
+  /// For access SPECIFIC: user ids
+  allowedUserIds      String[]
+  startedById         String
+  startedAt           DateTime             @default(now())
+  endedAt             DateTime?
+  availableAt         DateTime?
+  error               String?
+  archivedAt          DateTime?
+  /// Retention: may be deleted after this date
+  retainUntil         DateTime?
+  deletedAt           DateTime?
+  deletedById         String?
+  createdAt           DateTime             @default(now())
+  meeting             VideoMeeting         @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@index([meetingId])
+  @@index([status])
+}
+
+/// Meeting chat, sent through the ERP (so it is moderated, retained per policy and audited) and relayed to the room.
+model VideoChatMessage {
+  id          String       @id @default(cuid())
+  meetingId   String
+  senderUserId String?
+  senderName  String
+  message     String
+  createdAt   DateTime     @default(now())
+  deletedAt   DateTime?
+  deletedById String?
+  meeting     VideoMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@index([meetingId, createdAt])
+}
+
+/// Panel notes: examiner notes and results (viva), review notes and recommendations (PhD), mentor notes.
+model VideoMeetingNote {
+  id           String       @id @default(cuid())
+  meetingId    String
+  authorUserId String
+  /// EXAMINER_NOTE, RESULT, REVIEW_NOTE, RECOMMENDATION, MENTOR_NOTE, FOLLOW_UP
+  kind         String
+  body         String
+  followUpOn   DateTime?    @db.Date
+  createdAt    DateTime     @default(now())
+  meeting      VideoMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@index([meetingId])
+}
+
+/// A secure, meeting-specific, time-limited and revocable invitation for someone without an ERP account
+/// (external examiner, guest speaker, interviewee). Only a hash of the link token is stored.
+model VideoMeetingGuest {
+  id          String       @id @default(cuid())
+  meetingId   String
+  name        String
+  email       String
+  tokenHash   String       @unique
+  role        VideoParticipantRole @default(PARTICIPANT)
+  panelRole   String?
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  lastUsedAt  DateTime?
+  createdById String
+  createdAt   DateTime     @default(now())
+  meeting     VideoMeeting @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+
+  @@index([meetingId])
+}
+
+/// Every provider webhook, once: the event id makes processing idempotent.
+model VideoWebhookEvent {
+  id          String    @id @default(cuid())
+  eventId     String    @unique
+  event       String
+  roomName    String?
+  createdAt   DateTime  @default(now())
+  processedAt DateTime?
+  error       String?
+  payload     Json
+
+  @@index([event, createdAt])
+}

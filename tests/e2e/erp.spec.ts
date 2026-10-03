@@ -5,9 +5,11 @@ const PASSWORD = "Examcore@2026";
 async function login(page: Page, identifier: string) {
   await page.context().clearCookies();
   await page.goto("/login");
-  await page.getByLabel("E-mail or employee ID").fill(identifier);
+  // Progressive sign-in: university ID first, then the password.
+  await page.getByLabel("University ID or e-mail").fill(identifier);
+  await page.getByRole("button", { name: "Continue" }).click();
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
   await expect(page).toHaveURL(/\/(dashboard|portal)/);
 }
 

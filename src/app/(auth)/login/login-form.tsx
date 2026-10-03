@@ -1,121 +1,131 @@
 "use client";
 
-import { LanguageSwitcher } from "@/components/language-switcher";
-import { type Locale, translate } from "@/lib/i18n";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { AlertCircle, ArrowRight, Eye, EyeOff, Info, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { useRef, useState, useTransition } from "react";
+import { ArrowLeft, AtSign, KeyRound } from "lucide-react";
+import { AuthButton, AuthField, AuthHeading, AuthNotice, Divider, PasswordField } from "@/components/auth/fields";
+import { SsoButtons } from "@/components/auth/sso-buttons";
 import { loginAction } from "@/features/auth/actions";
+import { type Locale, translate } from "@/lib/i18n";
 
-const schema = z.object({
-  identifier: z.string().trim().min(1, "Enter your e-mail or employee ID"),
-  password: z.string().min(1, "Enter your password"),
-  remember: z.boolean(),
-});
-type Values = z.infer<typeof schema>;
-
-export function LoginForm({ notice, ssoError, providers = [], locale = "en" }: { notice?: string; ssoError?: string; providers?: { slug: string; label: string }[]; locale?: Locale }) {
+/**
+ * Progressive sign-in: (1) university ID or e-mail, (2) password, (3) two-step verification when the
+ * account has it. The role is worked out from the account after sign-in, so nobody picks one here.
+ * Nothing is sent to the server before step 2, so the page never reveals whether an account exists.
+ */
+export function LoginForm({ notice, ssoError, providers = [], locale = "en", platformName }: { notice?: string; ssoError?: string; providers?: { slug: string; label: string }[]; locale?: Locale; platformName: string }) {
   const t = (x: string) => translate(locale, x);
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
-  const [show, setShow] = useState(false);
-  const [pending, start] = useTransition();
-  const form = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { identifier: "", password: "", remember: false } });
+  const [step, setStep] = useState<"id" | "password">("id");
+  const [identifier, setIdentifier] = useState("");
+  const [password, setPassword] = useState("");
+  const [remember, setRemember] = useState(false);
+  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(ssoError ?? null);
+  const [state, setState] = useState<"idle" | "loading" | "success">("idle");
+  const [shake, setShake] = useState(0);
+  const [, start] = useTransition();
+  const pwRef = useRef<HTMLInputElement>(null);
+  const idRef = useRef<HTMLInputElement>(null);
 
-  const onSubmit = form.handleSubmit((values) =>
+  const fail = (msg: string) => { setError(msg); setShake((n) => n + 1); };
+
+  const toPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!identifier.trim()) { setFieldError(t("Please enter your university ID or e-mail.")); setShake((n) => n + 1); idRef.current?.focus(); return; }
+    setFieldError(null);
+    setError(null);
+    setStep("password");
+    setTimeout(() => pwRef.current?.focus(), 30);
+  };
+
+  const signIn = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!password) { setFieldError(t("Please enter your password.")); setShake((n) => n + 1); pwRef.current?.focus(); return; }
+    setFieldError(null);
+    setError(null);
+    setState("loading");
     start(async () => {
-      setError(null);
-      const res = await loginAction(values);
+      const res = await loginAction({ identifier, password, remember });
       if (!res.ok) {
-        setError(res.error);
-        form.setValue("password", "");
-        form.setFocus("password");
+        setState("idle");
+        setPassword("");
+        fail(res.error);
+        pwRef.current?.focus();
         return;
       }
-      router.replace(res.data.next === "mfa" ? "/login/mfa" : "/dashboard");
-      router.refresh();
-    }),
-  );
+      if (res.data.next === "mfa") { router.replace("/login/mfa"); return; }
+      setState("success");
+      setTimeout(() => { router.replace("/dashboard"); router.refresh(); }, 650);
+    });
+  };
 
   return (
-    <div>
-      <div className="flex items-start justify-between gap-3"><h2 className="text-[34px] leading-none">{t("Sign in")}</h2><LanguageSwitcher current={locale} label={t("Language")} /></div>
+    <div className={state === "success" ? "auth-fade-out [animation-delay:350ms]" : undefined}>
+      <AuthHeading title={t("Welcome back")} subtitle={`${t("Sign in to your")} ${platformName}`} />
+      {notice && !error && <AuthNotice>{notice}</AuthNotice>}
+      <div aria-live="assertive">{error && <AuthNotice tone="error" id="login-error">{error}</AuthNotice>}</div>
 
-      {notice && (
-        <div role="status" className="mt-6 flex items-start gap-2 rounded-lg border bg-muted/50 px-3 py-2.5 text-sm">
-          <Info className="mt-0.5 size-4 shrink-0 text-tone-info" /> {notice}
-        </div>
-      )}
-      {(error || ssoError) && (
-        <div role="alert" className="mt-6 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5 text-sm text-destructive">
-          <AlertCircle className="mt-0.5 size-4 shrink-0" /> {error ?? ssoError}
-        </div>
-      )}
-
-      <form onSubmit={onSubmit} className="mt-8 space-y-6" noValidate>
-        <div className="space-y-1.5">
-          <Label htmlFor="identifier">{t("E-mail or employee ID")}</Label>
-          <Input
+      {step === "id" ? (
+        <form key={`id-${shake}`} onSubmit={toPassword} noValidate className={shake ? "auth-shake" : undefined}>
+          <AuthField
+            ref={idRef}
             id="identifier"
+            name="username"
+            label={t("University ID or e-mail")}
+            icon={AtSign}
             autoComplete="username"
+            autoCapitalize="none"
+            spellCheck={false}
             autoFocus
-            className="h-10"
-            aria-invalid={!!form.formState.errors.identifier}
-            aria-describedby={form.formState.errors.identifier ? "identifier-error" : undefined}
-            {...form.register("identifier")}
+            value={identifier}
+            onChange={(e) => setIdentifier(e.target.value)}
+            error={fieldError}
           />
-          {form.formState.errors.identifier && <p id="identifier-error" className="text-xs text-destructive">{form.formState.errors.identifier.message}</p>}
-        </div>
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <Label htmlFor="password">{t("Password")}</Label>
-            <Link href="/forgot-password" className="text-xs font-medium text-primary hover:underline">{t("Forgot password?")}</Link>
+          {/* Lets password managers fill both fields from the first step. */}
+          <input type="password" name="password" autoComplete="current-password" tabIndex={-1} className="sr-only" aria-hidden value={password} onChange={(e) => setPassword(e.target.value)} />
+          <AuthButton type="submit" className="mt-6">{t("Continue")}</AuthButton>
+          <div className="mt-5 text-center">
+            <Link href="/forgot-password" className="auth-link inline-flex min-h-11 items-center px-1 text-[14px]">{t("Forgot password?")}</Link>
           </div>
-          <div className="relative">
-            <Input
-              id="password"
-              type={show ? "text" : "password"}
-              autoComplete="current-password"
-              className="h-10 pr-10"
-              aria-invalid={!!form.formState.errors.password}
-              aria-describedby={form.formState.errors.password ? "password-error" : undefined}
-              {...form.register("password")}
-            />
-            <button type="button" onClick={() => setShow((s) => !s)} className="absolute inset-y-0 right-0 grid w-10 place-items-center text-muted-foreground hover:text-foreground" aria-label={show ? "Hide password" : "Show password"}>
-              {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+          {providers.length > 0 && (
+            <>
+              <Divider label={t("or")} />
+              <SsoButtons providers={providers} label={(p) => `${t("Continue with")} ${p}`} />
+            </>
+          )}
+        </form>
+      ) : (
+        <form key={`pw-${shake}`} onSubmit={signIn} noValidate className={`auth-step ${shake ? "auth-shake" : ""}`}>
+          <div className="mb-6 flex items-center justify-between gap-3 rounded-[12px] border border-[var(--line)] bg-[var(--surface)] py-1.5 pr-1.5 pl-4">
+            <span className="min-w-0 truncate text-[14px] text-[var(--text)]" title={identifier}>{identifier}</span>
+            <button type="button" onClick={() => { setStep("id"); setPassword(""); setFieldError(null); setError(null); setTimeout(() => idRef.current?.focus(), 30); }}
+              className="auth-link inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-[10px] px-3 text-[13px]" aria-label={t("Use a different university ID")}>
+              <ArrowLeft className="size-3.5" aria-hidden /> {t("Change")}
             </button>
           </div>
-          {form.formState.errors.password && <p id="password-error" className="text-xs text-destructive">{form.formState.errors.password.message}</p>}
-        </div>
-        <label className="flex items-center gap-2 text-sm">
-          <Checkbox checked={form.watch("remember")} onCheckedChange={(v) => form.setValue("remember", v === true)} />
-          {t("Remember this device")}
-        </label>
-        <Button type="submit" className="h-11 w-full" disabled={pending}>
-          {pending ? <Loader2 className="animate-spin" /> : null}
-          {t("Sign in")} <ArrowRight />
-        </Button>
-      </form>
-
-      {providers.length > 0 && (
-        <div className="mt-5 space-y-2">
-          <div className="flex items-center gap-3 text-xs text-muted-foreground"><span className="h-px flex-1 bg-border" />{t("or")}<span className="h-px flex-1 bg-border" /></div>
-          {providers.map((p) => (
-            <Button key={p.slug} asChild variant="outline" className="h-10 w-full">
-              <a href={`/api/auth/sso/${p.slug}${form.watch("remember") ? "?remember=1" : ""}`}>{t("Continue with")} {p.label}</a>
-            </Button>
-          ))}
-        </div>
+          <input type="text" name="username" autoComplete="username" value={identifier} readOnly tabIndex={-1} className="sr-only" aria-hidden />
+          <PasswordField
+            ref={pwRef}
+            id="password"
+            name="password"
+            label={t("Password")}
+            icon={KeyRound}
+            autoComplete="current-password"
+            autoFocus
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            error={fieldError}
+            labelAside={<Link href="/forgot-password" className="auth-link inline-flex min-h-11 items-center px-1 text-[13px]">{t("Forgot password?")}</Link>}
+          />
+          <label className="mt-4 flex min-h-11 cursor-pointer items-center gap-3 text-[14px] text-[var(--text-2)]">
+            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="size-[18px] rounded accent-[var(--brand)]" />
+            {t("Remember this device")}
+          </label>
+          <AuthButton type="submit" className="mt-4" state={state} loadingLabel={t("Signing in…")} successLabel={t("Authentication successful")}>{t("Continue")}</AuthButton>
+        </form>
       )}
-
     </div>
   );
 }

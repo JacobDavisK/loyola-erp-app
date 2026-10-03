@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext } from "react";
+import { createContext, useCallback, useContext } from "react";
 
 const Ctx = createContext<Record<string, string>>({});
 
@@ -11,5 +11,6 @@ export function I18nProvider({ dict, children }: { dict: Record<string, string>;
 
 export function useT() {
   const dict = useContext(Ctx);
-  return (text: string) => dict[text] ?? text;
+  // Stable per dictionary, so components can list t in effect dependencies without re-running them every render.
+  return useCallback((text: string) => dict[text] ?? text, [dict]);
 }

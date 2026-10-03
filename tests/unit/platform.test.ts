@@ -47,7 +47,8 @@ describe("role catalogue", () => {
     expect(SELF_SCOPED_ROLES).toEqual(expect.arrayContaining(["STUDENT", "GUARDIAN"]));
     for (const key of SELF_SCOPED_ROLES) {
       const perms = SYSTEM_ROLES[key as keyof typeof SYSTEM_ROLES].permissions;
-      expect(perms.every((p) => ["self.portal", "enrollment.self", "revaluation.request", "credential.request", "scholarship.apply"].includes(p))).toBe(true);
+      // video.join / video.view_recording only ever reach meetings the person is invited to or enrolled in.
+      expect(perms.every((p) => ["self.portal", "enrollment.self", "revaluation.request", "credential.request", "scholarship.apply", "video.join", "video.view_recording"].includes(p))).toBe(true);
     }
   });
   it("IT administration never includes academic or examination content", () => {

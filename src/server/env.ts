@@ -8,6 +8,37 @@ const schema = z.object({
   DATA_ENCRYPTION_KEY: z.string().refine((v) => Buffer.from(v, "base64").length === 32, "DATA_ENCRYPTION_KEY must be 32 bytes, base64"),
   APP_URL: z.string().url().default("http://localhost:3000"),
   EXAMCORE_DEMO_MODE: z.string().optional(),
+  /** Video & collaboration (OpenVidu 3 / LiveKit protocol). "none" keeps scheduling, attendance and records but cannot connect media. */
+  VIDEO_PROVIDER: z.enum(["none", "openvidu"]).default("none"),
+  /** Server URL of OpenVidu, e.g. https://video.university.edu (browsers connect to the matching wss:// address) */
+  OPENVIDU_URL: z.string().url().optional(),
+  OPENVIDU_API_KEY: z.string().optional(),
+  /** API secret (also signs webhooks). Never sent to browsers. Accepts OPENVIDU_SECRET as an alias. */
+  OPENVIDU_API_SECRET: z.string().optional(),
+  OPENVIDU_SECRET: z.string().optional(),
+  OPENVIDU_RECORDING_ENABLED: z.enum(["true", "false"]).default("true"),
+  /** Where OpenVidu writes recordings: "s3" (the bucket configured in OpenVidu, MinIO by default) or "none" */
+  OPENVIDU_RECORDING_STORAGE: z.enum(["s3", "none"]).default("s3"),
+  OPENVIDU_RECORDING_PREFIX: z.string().default("recordings/erp"),
+  RECORDING_S3_ENDPOINT: z.string().url().optional(),
+  RECORDING_S3_REGION: z.string().default("us-east-1"),
+  RECORDING_S3_BUCKET: z.string().default("openvidu-appdata"),
+  RECORDING_S3_ACCESS_KEY: z.string().optional(),
+  RECORDING_S3_SECRET_KEY: z.string().optional(),
+  RECORDING_S3_FORCE_PATH_STYLE: z.enum(["true", "false"]).default("true"),
+  /** Optional ICE overrides given to authorised browsers (OpenVidu normally supplies its own STUN/TURN). */
+  OPENVIDU_STUN_SERVER: z.string().optional(),
+  OPENVIDU_TURN_SERVER: z.string().optional(),
+  OPENVIDU_TURN_USERNAME: z.string().optional(),
+  OPENVIDU_TURN_CREDENTIAL: z.string().optional(),
+  /** Sign-in branding for this installation (see src/lib/branding.ts) */
+  UNIVERSITY_NAME: z.string().optional(),
+  UNIVERSITY_LOGO: z.string().optional(),
+  PRIMARY_COLOR: z.string().optional(),
+  SECONDARY_COLOR: z.string().optional(),
+  TAGLINE: z.string().optional(),
+  CAMPUS_NAME: z.string().optional(),
+  SUPPORT_EMAIL: z.string().optional(),
   /** The Super Admin's own sign-in name, when one was chosen for this installation (its account is then never offered for demo sign-in). */
   SUPER_ADMIN_LOGIN: z.string().optional(),
   STORAGE_DRIVER: z.enum(["local"]).default("local"),
@@ -40,7 +71,20 @@ const schema = z.object({
   PUSH_CONTACT: z.string().default("mailto:it@example.edu"),
 });
 
-const parsed = schema.safeParse(process.env);
+const parsed = schema.superRefine((v, ctx) => {
+  if (v.VIDEO_PROVIDER !== "openvidu") return;
+  const secret = v.OPENVIDU_API_SECRET ?? v.OPENVIDU_SECRET;
+  if (!v.OPENVIDU_URL) ctx.addIssue({ code: "custom", path: ["OPENVIDU_URL"], message: "required when VIDEO_PROVIDER=openvidu" });
+  if (!v.OPENVIDU_API_KEY) ctx.addIssue({ code: "custom", path: ["OPENVIDU_API_KEY"], message: "required when VIDEO_PROVIDER=openvidu" });
+  if (!secret) ctx.addIssue({ code: "custom", path: ["OPENVIDU_API_SECRET"], message: "required when VIDEO_PROVIDER=openvidu" });
+  if (v.NODE_ENV === "production") {
+    if (v.OPENVIDU_URL && !v.OPENVIDU_URL.startsWith("https://")) ctx.addIssue({ code: "custom", path: ["OPENVIDU_URL"], message: "must use https:// in production" });
+    if (secret && secret.length < 32) ctx.addIssue({ code: "custom", path: ["OPENVIDU_API_SECRET"], message: "must be at least 32 characters in production" });
+    if (v.OPENVIDU_RECORDING_ENABLED === "true" && v.OPENVIDU_RECORDING_STORAGE === "s3" && !(v.RECORDING_S3_ENDPOINT && v.RECORDING_S3_ACCESS_KEY && v.RECORDING_S3_SECRET_KEY)) {
+      ctx.addIssue({ code: "custom", path: ["RECORDING_S3_ENDPOINT"], message: "recording storage (endpoint, access key, secret key) is required when recording is enabled" });
+    }
+  }
+}).safeParse(process.env);
 if (!parsed.success) {
   throw new Error(`Invalid environment configuration:\n${parsed.error.issues.map((i) => ` • ${i.path.join(".")}: ${i.message}`).join("\n")}`);
 }

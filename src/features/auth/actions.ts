@@ -28,8 +28,9 @@ export async function loginAction(raw: unknown): Promise<ActionResult<{ next: "d
   return runAction(async () => {
     const input = loginSchema.parse(raw);
     const out = await authenticate(input.identifier, input.password, input.remember);
-    if (out.status === "invalid") throw invalid("The e-mail/employee ID or password is incorrect.");
-    if (out.status === "locked") throw forbidden(`This account is temporarily locked after repeated failed attempts. Try again in ${out.minutes} minute${out.minutes === 1 ? "" : "s"} or contact the Examination Cell.`);
+    // Same message whether the account exists or not.
+    if (out.status === "invalid") throw invalid("Your university ID or password doesn't match our records.");
+    if (out.status === "locked") throw forbidden("Your account is temporarily unavailable. Please contact IT Support.");
     return { next: out.status === "mfa" ? ("mfa" as const) : ("dashboard" as const) };
   });
 }

@@ -300,6 +300,8 @@ model User {
   apiTokens             ApiToken[]
   calendarFeed          CalendarFeed?
   demoGrants            DemoGrant[]          @relation("DemoGrantAccount")
+  videoMeetingsHosted   VideoMeeting[]       @relation("VideoMeetingHost")
+  videoParticipations   VideoMeetingParticipant[] @relation("VideoParticipantUser")
 
   @@index([departmentId])
   @@index([userType])
@@ -497,6 +499,7 @@ model Department {
   purchaseRequests PurchaseRequest[]
   purchaseOrders   PurchaseOrder[]
   assets           Asset[]
+  videoMeetings  VideoMeeting[]
 }
 
 model Program {

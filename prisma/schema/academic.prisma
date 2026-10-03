@@ -359,6 +359,7 @@ model CourseOffering {
   /// Weekly teaching load used by the timetable generator (defaults from the course credits and mode)
   weeklyLectures Int?
   weeklyLabs     Int?
+  videoMeetings VideoMeeting[]
 
   @@unique([courseId, termId, section])
   @@index([termId])
@@ -427,6 +428,7 @@ model ClassMeeting {
   room       Room?              @relation(fields: [roomId], references: [id])
   records    AttendanceRecord[]
   checkIn    CheckInWindow?
+  videoMeeting VideoMeeting?
 
   @@unique([offeringId, startsAt])
   @@index([date])

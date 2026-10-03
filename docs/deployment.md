@@ -20,6 +20,8 @@
 | `announcements.dispatch` | 5 min | Send scheduled announcements when they go live |
 | `admissions.expireOffers` | 1 h | Lapse admission offers past their validity |
 | `library.reminders` | 24 h | Due-tomorrow and overdue notices |
+| `video.reminders` | 1 min | "Meeting starts soon" reminders |
+| `video.retention` | 24 h | Delete recordings and meeting chat past their retention period |
 
 *Configuration centre → System health* shows the worker heartbeat, queue depth and failed jobs.
 
@@ -63,6 +65,22 @@ npm run db:migrate && npm run rbac:sync
 ```
 
 Migrations are forward-only and are tested against the seeded database in CI (`npm run test:integration` recreates the test database from migrations).
+
+## Video conferencing (optional)
+
+Live classes and meetings need a self-hosted **OpenVidu 3** server on its own machine (public IP, DNS name,
+TLS, WebRTC/TURN ports open). Without it everything else works and meetings simply cannot start.
+
+1. Install OpenVidu with the official installer (Single Node is enough for one campus).
+2. Set `VIDEO_PROVIDER`, `OPENVIDU_URL`, `OPENVIDU_API_KEY`, `OPENVIDU_API_SECRET` (and the `RECORDING_S3_*`
+   variables if recording) in the ERP environment; restart.
+3. Configure OpenVidu's webhook to `https://<erp>/api/video/webhooks/openvidu` (required for attendance and
+   recordings).
+4. Check *Configuration centre → Video & collaboration* and `GET /api/video/health`.
+
+Monitor `/api/video/health` (503 = video service down). Recordings live in OpenVidu's S3/MinIO bucket — include
+it in backups if recordings must survive a server loss. Details: `openvidu-setup.md`, `video-administration.md`,
+`video-troubleshooting.md`.
 
 ## Backup and restore
 

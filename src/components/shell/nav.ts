@@ -27,6 +27,7 @@ export const NAV: NavGroup[] = [
       { label: "My portal", href: "/portal", icon: "layout-dashboard", audience: "self", any: ["self.portal"] },
       { label: "Approval centre", href: "/inbox", icon: "inbox", badgeKey: "inbox", audience: "staff" },
       { label: "Student portal (view as)", href: "/portal", icon: "graduation-cap", audience: "staff", superAdmin: true },
+      { label: "Meetings", href: "/video", icon: "video", any: ["video.join"] },
       { label: "Notifications", href: "/notifications", icon: "bell" },
       { label: "Announcements", href: "/announcements", icon: "megaphone" },
       { label: "Helpdesk", href: "/helpdesk", icon: "life-buoy" },
@@ -233,7 +234,8 @@ export const NAV: NavGroup[] = [
     label: "System",
     items: [
       { label: "Templates & branding", href: "/templates", icon: "palette", any: ["admin.templates.manage"] },
-      { label: "Configuration centre", href: "/admin", icon: "settings", any: ["admin.users.manage", "admin.roles.manage", "admin.settings.manage", "admin.institution.manage", "workflow.manage", "system.health", "lti.manage", "messaging.manage"] },
+      { label: "Configuration centre", href: "/admin", icon: "settings", any: ["admin.users.manage", "admin.roles.manage", "admin.settings.manage", "admin.institution.manage", "workflow.manage", "system.health", "lti.manage", "messaging.manage", "video.manage_settings"] },
+      { label: "Video administration", href: "/video/admin", icon: "monitor-play", any: ["video.view_analytics"], audience: "staff" },
     ],
   },
 ];

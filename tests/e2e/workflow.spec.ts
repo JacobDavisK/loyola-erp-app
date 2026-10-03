@@ -5,9 +5,11 @@ const PASSWORD = "Examcore@2026";
 async function login(page: Page, identifier: string) {
   await page.context().clearCookies();
   await page.goto("/login");
-  await page.getByLabel("E-mail or employee ID").fill(identifier);
+  // Progressive sign-in: university ID first, then the password.
+  await page.getByLabel("University ID or e-mail").fill(identifier);
+  await page.getByRole("button", { name: "Continue" }).click();
   await page.getByLabel("Password", { exact: true }).fill(PASSWORD);
-  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Continue" }).click();
   await expect(page).toHaveURL(/\/dashboard/);
 }
 
@@ -15,10 +17,11 @@ test.describe.configure({ mode: "serial" });
 
 test("rejects a wrong password with a generic message", async ({ page }) => {
   await page.goto("/login");
-  await page.getByLabel("E-mail or employee ID").fill("setter@example.edu");
+  await page.getByLabel("University ID or e-mail").fill("setter@example.edu");
+  await page.getByRole("button", { name: "Continue" }).click();
   await page.getByLabel("Password", { exact: true }).fill("wrong-password-1");
-  await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.getByRole("alert").filter({ hasText: "incorrect" })).toBeVisible();
+  await page.getByRole("button", { name: "Continue" }).click();
+  await expect(page.getByRole("alert").filter({ hasText: "doesn't match our records" })).toBeVisible();
   await expect(page).toHaveURL(/\/login/);
 });
 

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, BookOpen, Building2, ClipboardList, FileText, Library, Loader2, UserRound } from "lucide-react";
+import { ArrowRight, BookOpen, Building2, ClipboardList, FileText, Library, Loader2, UserRound, Video } from "lucide-react";
 import {
   Command, CommandDialog, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator, CommandShortcut,
 } from "@/components/ui/command";
@@ -23,6 +23,7 @@ const CATEGORY_ICON = {
   Examinations: ClipboardList,
   Users: UserRound,
   Departments: Building2,
+  Meetings: Video,
 } as const;
 
 export function CommandPalette({ open, onOpenChange, commands }: { open: boolean; onOpenChange: (o: boolean) => void; commands: PaletteCommand[] }) {

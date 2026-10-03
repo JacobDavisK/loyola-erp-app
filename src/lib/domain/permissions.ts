@@ -118,6 +118,23 @@ export const PERMISSIONS = {
   "events.manage": { module: "Campus life", description: "Create clubs and campus events and record participation" },
   "convocation.manage": { module: "Campus life", description: "Plan convocations: graduates, registration, seating, gowns and degrees" },
   "messaging.manage": { module: "Campus life", description: "See the SMS / WhatsApp message log and delivery status" },
+  "video.create": { module: "Video & collaboration", description: "Create video meetings and start instant meetings" },
+  "video.schedule": { module: "Video & collaboration", description: "Schedule video meetings and invite participants" },
+  "video.start": { module: "Video & collaboration", description: "Start meetings they host or co-host" },
+  "video.join": { module: "Video & collaboration", description: "Join video meetings they are invited to or allowed into" },
+  "video.end": { module: "Video & collaboration", description: "End meetings they host or co-host" },
+  "video.manage_participants": { module: "Video & collaboration", description: "Add, admit and change the roles of participants in meetings they host" },
+  "video.mute_participants": { module: "Video & collaboration", description: "Mute participants in meetings they host or moderate" },
+  "video.remove_participant": { module: "Video & collaboration", description: "Remove participants from meetings they host or moderate" },
+  "video.assign_cohost": { module: "Video & collaboration", description: "Make participants co-hosts in meetings they host" },
+  "video.enable_recording": { module: "Video & collaboration", description: "Record meetings they host (where recording is allowed)" },
+  "video.view_recording": { module: "Video & collaboration", description: "Watch recordings they are entitled to" },
+  "video.delete_recording": { module: "Video & collaboration", description: "Delete or archive meeting recordings in scope" },
+  "video.view_attendance": { module: "Video & collaboration", description: "See meeting attendance for meetings they host, or in scope" },
+  "video.modify_attendance": { module: "Video & collaboration", description: "Correct meeting attendance, with a reason, in scope" },
+  "video.view_analytics": { module: "Video & collaboration", description: "See video meeting analytics in scope" },
+  "video.manage_settings": { module: "Video & collaboration", description: "Manage video meeting types and defaults" },
+  "video.manage_global_settings": { module: "Video & collaboration", description: "Manage institution-wide video settings: limits, recording, retention, guests" },
   "demo.manage": { module: "System", description: "Give people access to the demo accounts (Demo Users): enrol their e-mail and generate a password" },
   "integration.manage": { module: "System", description: "Configure single sign-on, webhooks to other systems, and see every API token" },
   // Operations
@@ -222,7 +239,7 @@ const EXAM_ROLES = {
       "paper.override", "paper.export.draft", "paper.export.final", "paper.package", "report.view",
       "analytics.view", "audit.view", "user.directory", "admin.templates.manage", "student.view", "workflow.monitor",
       "examreg.manage", "seating.manage", "marks.approve", "valuation.manage", "grading.manage", "result.process", "result.view",
-      "result.withhold", "revaluation.manage", "credential.issue", "attendance.view", "apaar.manage", "obe.view", "badge.manage",
+      "result.withhold", "revaluation.manage", "credential.issue", "attendance.view", "apaar.manage", "obe.view", "badge.manage", "video.create", "video.schedule", "video.start", "video.join", "video.end", "video.manage_participants", "video.mute_participants", "video.remove_participant", "video.assign_cohost", "video.enable_recording", "video.view_recording", "video.view_attendance"
     ],
   },
   DEPUTY_CONTROLLER: {
@@ -235,7 +252,7 @@ const EXAM_ROLES = {
       "academic.view", "session.manage", "exam.manage", "exam.view", "question.view", "blueprint.manage",
       "blueprint.view", "assignment.manage", "paper.view.scope", "paper.release", "paper.export.draft",
       "paper.export.final", "paper.package", "report.view", "analytics.view", "user.directory", "student.view",
-      "examreg.manage", "seating.manage", "valuation.manage", "result.process", "result.view", "revaluation.manage", "attendance.view",
+      "examreg.manage", "seating.manage", "valuation.manage", "result.process", "result.view", "revaluation.manage", "attendance.view", "video.create", "video.schedule", "video.start", "video.join", "video.end", "video.manage_participants", "video.mute_participants", "video.remove_participant", "video.assign_cohost", "video.enable_recording", "video.view_recording", "video.view_attendance"
     ],
   },
   EXAM_CELL_STAFF: {
@@ -257,7 +274,7 @@ const EXAM_ROLES = {
       "blueprint.view", "assignment.recommend", "paper.view.scope", "report.view", "user.directory",
       "student.view", "student.status", "attendance.view", "attendance.manage", "enrollment.manage", "faculty.view",
       "marks.enter", "marks.verify", "result.view", "exam.duty", "concession.request", "hr.view", "attendance.staff", "research.view", "iqac.view",
-      "credittransfer.review", "obe.manage", "obe.view", "success.view", "success.manage", "mentoring.manage", "survey.manage", "survey.results", "badge.manage", "grievance.handle", "procurement.request", "budget.view",
+      "credittransfer.review", "obe.manage", "obe.view", "success.view", "success.manage", "mentoring.manage", "survey.manage", "survey.results", "badge.manage", "grievance.handle", "procurement.request", "budget.view", "video.create", "video.schedule", "video.start", "video.join", "video.end", "video.manage_participants", "video.mute_participants", "video.remove_participant", "video.assign_cohost", "video.enable_recording", "video.view_recording", "video.view_attendance", "video.modify_attendance", "video.view_analytics", "video.delete_recording"
     ],
   },
   SETTER: {
@@ -319,7 +336,7 @@ const UNIVERSITY_ROLES = {
       "admin.users.manage", "admin.institution.manage", "academic.manage", "academic.view", "curriculum.manage",
       "timetable.manage", "enrollment.manage", "student.view", "student.create", "student.update", "student.status",
       "student.export", "faculty.view", "attendance.view", "report.view", "analytics.view", "user.directory",
-      "workflow.manage", "workflow.monitor", "hr.view", "announcement.publish", "helpdesk.manage", "helpdesk.agent", "knowledge.manage", "lti.manage",
+      "workflow.manage", "workflow.monitor", "hr.view", "announcement.publish", "helpdesk.manage", "helpdesk.agent", "knowledge.manage", "lti.manage", "video.create", "video.schedule", "video.start", "video.join", "video.end", "video.manage_participants", "video.mute_participants", "video.remove_participant", "video.assign_cohost", "video.enable_recording", "video.view_recording", "video.view_attendance", "video.modify_attendance", "video.view_analytics", "video.delete_recording", "video.manage_settings"
     ],
   },
   REGISTRAR: {
@@ -333,7 +350,7 @@ const UNIVERSITY_ROLES = {
       "student.view", "student.create", "student.update", "student.status", "student.export", "student.delete",
       "attendance.view", "attendance.manage", "faculty.view", "exam.view", "report.view", "analytics.view",
       "user.directory", "workflow.monitor", "result.view", "credential.issue", "credential.revoke", "finance.view", "finance.report", "hr.view", "payroll.view", "research.view", "iqac.view", "announcement.publish", "admission.view", "alumni.view", "document.verify",
-      "apaar.manage", "nep.manage", "credittransfer.review", "obe.view", "success.view", "success.manage", "mentoring.manage", "knowledge.manage", "survey.manage", "survey.results", "badge.manage", "convocation.manage", "antiragging.manage",
+      "apaar.manage", "nep.manage", "credittransfer.review", "obe.view", "success.view", "success.manage", "mentoring.manage", "knowledge.manage", "survey.manage", "survey.results", "badge.manage", "convocation.manage", "antiragging.manage", "video.create", "video.schedule", "video.start", "video.join", "video.end", "video.manage_participants", "video.mute_participants", "video.remove_participant", "video.assign_cohost", "video.enable_recording", "video.view_recording", "video.view_attendance", "video.modify_attendance", "video.view_analytics", "video.delete_recording"
     ],
   },
   DEAN: {
@@ -344,7 +361,7 @@ const UNIVERSITY_ROLES = {
     defaultScope: "unit",
     permissions: [
       "academic.view", "exam.view", "student.view", "attendance.view", "faculty.view", "enrollment.manage",
-      "report.view", "analytics.view", "user.directory", "result.view", "hr.view", "research.view", "iqac.view", "obe.view", "success.view",
+      "report.view", "analytics.view", "user.directory", "result.view", "hr.view", "research.view", "iqac.view", "obe.view", "success.view", "video.create", "video.schedule", "video.start", "video.join", "video.end", "video.manage_participants", "video.mute_participants", "video.remove_participant", "video.assign_cohost", "video.enable_recording", "video.view_recording", "video.view_attendance", "video.modify_attendance", "video.view_analytics", "video.delete_recording"
     ],
   },
   ASSOCIATE_DEAN: {
@@ -353,7 +370,7 @@ const UNIVERSITY_ROLES = {
     rank: 14,
     global: false,
     defaultScope: "unit",
-    permissions: ["academic.view", "exam.view", "student.view", "attendance.view", "faculty.view", "report.view", "user.directory"],
+    permissions: ["academic.view", "exam.view", "student.view", "attendance.view", "faculty.view", "report.view", "user.directory", "video.create", "video.schedule", "video.start", "video.join", "video.end", "video.manage_participants", "video.mute_participants", "video.remove_participant", "video.assign_cohost", "video.enable_recording", "video.view_recording", "video.view_attendance", "video.modify_attendance", "video.view_analytics", "video.delete_recording"],
   },
   PRINCIPAL: {
     name: "Principal",
@@ -363,7 +380,7 @@ const UNIVERSITY_ROLES = {
     defaultScope: "campus",
     permissions: [
       "academic.view", "exam.view", "student.view", "student.status", "attendance.view", "faculty.view",
-      "enrollment.manage", "report.view", "analytics.view", "user.directory", "result.view", "hr.view", "attendance.staff", "research.view", "iqac.view", "obe.view", "success.view",
+      "enrollment.manage", "report.view", "analytics.view", "user.directory", "result.view", "hr.view", "attendance.staff", "research.view", "iqac.view", "obe.view", "success.view", "video.create", "video.schedule", "video.start", "video.join", "video.end", "video.manage_participants", "video.mute_participants", "video.remove_participant", "video.assign_cohost", "video.enable_recording", "video.view_recording", "video.view_attendance", "video.modify_attendance", "video.view_analytics", "video.delete_recording"
     ],
   },
   FACULTY: {
@@ -372,7 +389,7 @@ const UNIVERSITY_ROLES = {
     rank: 55,
     global: false,
     defaultScope: "department",
-    permissions: ["academic.view", "student.view", "attendance.take", "marks.enter", "exam.duty", "user.directory"],
+    permissions: ["academic.view", "student.view", "attendance.take", "marks.enter", "exam.duty", "user.directory", "video.create", "video.schedule", "video.start", "video.join", "video.end", "video.manage_participants", "video.mute_participants", "video.remove_participant", "video.assign_cohost", "video.enable_recording", "video.view_recording", "video.view_attendance"],
   },
   VISITING_FACULTY: {
     name: "Visiting Faculty",
@@ -380,7 +397,7 @@ const UNIVERSITY_ROLES = {
     rank: 65,
     global: false,
     defaultScope: "department",
-    permissions: ["academic.view", "attendance.take", "marks.enter", "exam.duty"],
+    permissions: ["academic.view", "attendance.take", "marks.enter", "exam.duty", "video.create", "video.schedule", "video.start", "video.join", "video.end", "video.manage_participants", "video.mute_participants", "video.remove_participant", "video.assign_cohost", "video.enable_recording", "video.view_recording", "video.view_attendance"],
   },
   STUDENT: {
     name: "Student",
@@ -388,7 +405,7 @@ const UNIVERSITY_ROLES = {
     rank: 100,
     global: false,
     defaultScope: "self",
-    permissions: ["self.portal", "enrollment.self", "revaluation.request", "credential.request", "scholarship.apply"],
+    permissions: ["self.portal", "enrollment.self", "revaluation.request", "credential.request", "scholarship.apply", "video.join", "video.view_recording"],
   },
   GUARDIAN: {
     name: "Parent / Guardian",
@@ -396,7 +413,7 @@ const UNIVERSITY_ROLES = {
     rank: 110,
     global: false,
     defaultScope: "self",
-    permissions: ["self.portal"],
+    permissions: ["self.portal", "video.join"],
   },
   IT_ADMIN: {
     name: "IT Administrator",
@@ -404,7 +421,7 @@ const UNIVERSITY_ROLES = {
     rank: 6,
     global: true,
     defaultScope: "global",
-    permissions: ["admin.users.manage", "admin.settings.manage", "system.health", "audit.view", "user.directory", "helpdesk.agent", "lti.manage", "messaging.manage", "integration.manage"],
+    permissions: ["admin.users.manage", "admin.settings.manage", "system.health", "audit.view", "user.directory", "helpdesk.agent", "lti.manage", "messaging.manage", "integration.manage", "video.join", "video.view_analytics", "video.manage_settings", "video.manage_global_settings"],
   },
   VALUER: {
     name: "Valuer",
@@ -420,7 +437,7 @@ const UNIVERSITY_ROLES = {
     rank: 72,
     global: false,
     defaultScope: "department",
-    permissions: ["valuation.perform", "moderation.perform", "paper.export.draft", "exam.duty"],
+    permissions: ["valuation.perform", "moderation.perform", "paper.export.draft", "exam.duty", "video.join", "video.view_recording"],
   },
   INVIGILATOR: {
     name: "Invigilator",
@@ -436,7 +453,7 @@ const UNIVERSITY_ROLES = {
     rank: 18,
     global: true,
     defaultScope: "global",
-    permissions: ["finance.view", "fee.manage", "invoice.manage", "payment.record", "concession.request", "scholarship.manage", "finance.report", "student.view", "academic.view", "user.directory", "payroll.view", "budget.manage", "budget.view", "procurement.pay"],
+    permissions: ["finance.view", "fee.manage", "invoice.manage", "payment.record", "concession.request", "scholarship.manage", "finance.report", "student.view", "academic.view", "user.directory", "payroll.view", "budget.manage", "budget.view", "procurement.pay", "video.create", "video.schedule", "video.start", "video.join", "video.end", "video.manage_participants", "video.mute_participants", "video.remove_participant", "video.assign_cohost", "video.enable_recording", "video.view_recording", "video.view_attendance"],
   },
   ACCOUNTS_OFFICER: {
     name: "Accounts Officer",
@@ -452,7 +469,7 @@ const UNIVERSITY_ROLES = {
     rank: 20,
     global: true,
     defaultScope: "global",
-    permissions: ["hr.view", "hr.manage", "leave.manage", "attendance.staff", "payroll.process", "payroll.view", "appraisal.manage", "faculty.view", "user.directory", "report.view"],
+    permissions: ["hr.view", "hr.manage", "leave.manage", "attendance.staff", "payroll.process", "payroll.view", "appraisal.manage", "faculty.view", "user.directory", "report.view", "video.create", "video.schedule", "video.start", "video.join", "video.end", "video.manage_participants", "video.mute_participants", "video.remove_participant", "video.assign_cohost", "video.enable_recording", "video.view_recording", "video.view_attendance"],
   },
   RESEARCH_DEAN: {
     name: "Dean of Research",
@@ -460,7 +477,7 @@ const UNIVERSITY_ROLES = {
     rank: 16,
     global: true,
     defaultScope: "global",
-    permissions: ["research.view", "research.manage", "iqac.view", "faculty.view", "report.view", "analytics.view", "user.directory"],
+    permissions: ["research.view", "research.manage", "iqac.view", "faculty.view", "report.view", "analytics.view", "user.directory", "video.create", "video.schedule", "video.start", "video.join", "video.end", "video.manage_participants", "video.mute_participants", "video.remove_participant", "video.assign_cohost", "video.enable_recording", "video.view_recording", "video.view_attendance"],
   },
   IQAC_COORDINATOR: {
     name: "IQAC Coordinator",
@@ -468,7 +485,7 @@ const UNIVERSITY_ROLES = {
     rank: 17,
     global: true,
     defaultScope: "global",
-    permissions: ["iqac.view", "iqac.manage", "research.view", "academic.view", "report.view", "analytics.view", "user.directory", "obe.view", "obe.manage", "survey.manage", "survey.results"],
+    permissions: ["iqac.view", "iqac.manage", "research.view", "academic.view", "report.view", "analytics.view", "user.directory", "obe.view", "obe.manage", "survey.manage", "survey.results", "video.create", "video.schedule", "video.start", "video.join", "video.end", "video.manage_participants", "video.mute_participants", "video.remove_participant", "video.assign_cohost", "video.enable_recording", "video.view_recording", "video.view_attendance"],
   },
   LIBRARIAN: {
     name: "Librarian",
@@ -516,7 +533,7 @@ const UNIVERSITY_ROLES = {
     rank: 25,
     global: true,
     defaultScope: "global",
-    permissions: ["admission.view", "admission.manage", "student.create", "student.view", "document.verify", "academic.view", "user.directory"],
+    permissions: ["admission.view", "admission.manage", "student.create", "student.view", "document.verify", "academic.view", "user.directory", "video.create", "video.schedule", "video.start", "video.join", "video.end", "video.manage_participants", "video.mute_participants", "video.remove_participant", "video.assign_cohost", "video.enable_recording", "video.view_recording", "video.view_attendance"],
   },
   PLACEMENT_OFFICER: {
     name: "Placement Officer",
@@ -524,7 +541,7 @@ const UNIVERSITY_ROLES = {
     rank: 30,
     global: true,
     defaultScope: "global",
-    permissions: ["placement.manage", "alumni.view", "student.view", "academic.view", "user.directory", "report.view"],
+    permissions: ["placement.manage", "alumni.view", "student.view", "academic.view", "user.directory", "report.view", "video.create", "video.schedule", "video.start", "video.join", "video.end", "video.manage_participants", "video.mute_participants", "video.remove_participant", "video.assign_cohost", "video.enable_recording", "video.view_recording", "video.view_attendance"],
   },
   DATA_PROTECTION_OFFICER: {
     name: "Data Protection Officer",
@@ -540,7 +557,7 @@ const UNIVERSITY_ROLES = {
     rank: 16,
     global: true,
     defaultScope: "global",
-    permissions: ["grievance.committee", "antiragging.manage", "events.manage", "badge.manage", "student.view", "success.view", "user.directory", "report.view"],
+    permissions: ["grievance.committee", "antiragging.manage", "events.manage", "badge.manage", "student.view", "success.view", "user.directory", "report.view", "video.create", "video.schedule", "video.start", "video.join", "video.end", "video.manage_participants", "video.mute_participants", "video.remove_participant", "video.assign_cohost", "video.enable_recording", "video.view_recording", "video.view_attendance"],
   },
   COUNSELLOR: {
     name: "Student Counsellor",
@@ -548,7 +565,7 @@ const UNIVERSITY_ROLES = {
     rank: 45,
     global: true,
     defaultScope: "global",
-    permissions: ["counselling.provide", "user.directory"],
+    permissions: ["counselling.provide", "user.directory", "video.create", "video.schedule", "video.start", "video.join", "video.end", "video.manage_participants", "video.mute_participants", "video.remove_participant", "video.assign_cohost", "video.enable_recording", "video.view_recording", "video.view_attendance"],
   },
   OMBUDSPERSON: {
     name: "Ombudsperson",

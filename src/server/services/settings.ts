@@ -161,6 +161,30 @@ export const SETTING_SCHEMAS = {
     approvalRoomTypes: z.array(z.enum(["CLASSROOM", "LAB", "SEMINAR_HALL", "EXAM_HALL", "AUDITORIUM", "OTHER"])),
     assetTagPrefix: z.string().max(20),
   }),
+  video: z.object({
+    enabledTypes: z.array(z.string().max(40)).max(30),
+    defaultDurationMinutes: z.number().int().min(10).max(480),
+    maxDurationMinutes: z.number().int().min(15).max(720),
+    maxParticipants: z.number().int().min(2).max(1000),
+    /** Join from this many minutes before the scheduled start */
+    joinEarlyMinutes: z.number().int().min(0).max(60),
+    recordingEnabled: z.boolean(),
+    recordingRetentionDays: z.number().int().min(1).max(3650),
+    recordingAccessDefault: z.enum(["HOST_ONLY", "PARTICIPANTS", "COURSE", "DEPARTMENT", "ADMINS"]),
+    allowRecordingDownload: z.boolean(),
+    lobbyDefault: z.boolean(),
+    chatDefault: z.boolean(),
+    screenShareDefault: z.boolean(),
+    /** Attendance: PRESENT at or above this share of the meeting */
+    attendancePresentPercent: z.number().min(1).max(100),
+    /** Attendance: PARTIALLY_PRESENT from this many minutes (below the threshold) */
+    attendancePartialMinMinutes: z.number().int().min(0).max(120),
+    guestAccessEnabled: z.boolean(),
+    /** Guest links stop working this many hours after the meeting's scheduled end */
+    guestGraceHours: z.number().int().min(0).max(72),
+    chatRetentionDays: z.number().int().min(1).max(3650),
+    reminderMinutes: z.number().int().min(0).max(120),
+  }),
   privacy: z.object({
     /** Days to respond to a data-principal request */
     requestDays: z.number().int().min(1).max(90),
@@ -266,6 +290,14 @@ export const SETTING_DEFAULTS: { [K in SettingKey]: SettingValue<K> } = {
   proctoring: { webcamIntervalMinutes: 3, flagThreshold: 5, retainDays: 90 },
   campus: { grievanceDays: 15, ombudspersonDays: 30, appealDays: 15, importantTypes: ["invoice.issued", "payment.received", "result.published", "revaluation.completed", "library.due", "placement.update", "counselling.booked", "grievance.update", "event.reminder", "convocation.update"] },
   operations: { approvalRoomTypes: ["SEMINAR_HALL", "AUDITORIUM", "EXAM_HALL"], assetTagPrefix: "AST/{YYYY}/" },
+  video: {
+    enabledTypes: ["ONLINE_CLASS", "FACULTY_MEETING", "DEPARTMENT_MEETING", "STUDENT_MENTORING", "PARENT_MEETING", "VIVA_VOCE", "PHD_REVIEW", "RESEARCH_MEETING", "WEBINAR", "GUEST_LECTURE", "WORKSHOP", "PLACEMENT_INTERVIEW", "ADMISSION_INTERVIEW", "EXAMINATION_MEETING", "ADMINISTRATIVE_MEETING", "GENERAL_MEETING"],
+    defaultDurationMinutes: 60, maxDurationMinutes: 240, maxParticipants: 300, joinEarlyMinutes: 15,
+    recordingEnabled: true, recordingRetentionDays: 365, recordingAccessDefault: "PARTICIPANTS", allowRecordingDownload: false,
+    lobbyDefault: false, chatDefault: true, screenShareDefault: true,
+    attendancePresentPercent: 75, attendancePartialMinMinutes: 5,
+    guestAccessEnabled: true, guestGraceHours: 2, chatRetentionDays: 180, reminderMinutes: 10,
+  },
   privacy: { requestDays: 30, breachNotifyHours: 72, dpoName: "Data Protection Officer", dpoEmail: "dpo@example.edu", adultAge: 18 },
 };
 

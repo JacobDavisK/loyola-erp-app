@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { NotebookPen } from "lucide-react";
+import { NotebookPen, Video } from "lucide-react";
 import type { Metadata } from "next";
 import { FormDialog } from "@/components/app/form-dialog";
 import { MEETING_FIELDS } from "@/features/success/fields";
@@ -26,6 +26,7 @@ export default async function MentoringPage() {
   const term = await currentTerm();
   const manageScope = scopeOf(ctx, "mentoring.manage");
   const manage = can(ctx, "mentoring.manage");
+  const online = can(ctx, "video.schedule");
   const mentees = await db.mentorAssignment.findMany({
     where: { mentorId: ctx.user.id, endsOn: null },
     orderBy: { student: { studentNo: "asc" } },
@@ -54,7 +55,7 @@ export default async function MentoringPage() {
                 <Td>{risk ? <StatusBadge meta={RISK_LEVEL[risk.level]} /> : "—"}</Td>
                 <Td className="text-xs">{last ? fmtDate(last.heldOn) : <span className="text-tone-warning">never</span>}</Td>
                 <Td className={due ? "text-xs font-medium text-tone-danger" : "text-xs"}>{last?.followUpOn ? fmtDate(last.followUpOn) : "—"}</Td>
-                <Td className="text-right"><FormDialog title="Meeting" columns={2} fields={MEETING_FIELDS} action={recordMeetingAction.bind(null, m.student.id)} submitLabel="Record" initial={{ mode: "IN_PERSON" }} trigger={<Button size="xs" variant="outline"><NotebookPen /> Record meeting</Button>} /></Td>
+                <Td className="text-right"><span className="inline-flex flex-wrap justify-end gap-1.5">{online && <Button size="xs" variant="outline" asChild><Link href={`/video/new?mentee=${m.student.id}`}><Video /> Online session</Link></Button>}<FormDialog title="Meeting" columns={2} fields={MEETING_FIELDS} action={recordMeetingAction.bind(null, m.student.id)} submitLabel="Record" initial={{ mode: "IN_PERSON" }} trigger={<Button size="xs" variant="outline"><NotebookPen /> Record meeting</Button>} /></span></Td>
               </tr>
             );
           })}

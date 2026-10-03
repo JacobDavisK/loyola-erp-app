@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { generateMeetingsAction, saveOfferingAction } from "@/features/academic-ops/actions";
 import { ActionButton } from "@/features/academic-ops/controls";
 import { DropButton, InstructorEditor, RegisterStudents, RemoveSlotButton, SlotForm } from "@/features/academic-ops/offering-panels";
+import { LiveClassesPanel } from "@/features/video/live-classes";
 import { STANDING_LABEL } from "@/lib/domain/attendance";
 import { OFFERING_STATUS, REGISTRATION_STATUS, SHEET_STATUS } from "@/lib/domain/labels";
 import { DAY_NAMES } from "@/lib/domain/timetable";
@@ -51,6 +52,7 @@ export default async function OfferingPage({ params, searchParams }: { params: P
     { key: "sessions", label: "Sessions", href: `/academics/offerings/${id}?tab=sessions` },
     { key: "attendance", label: "Attendance", href: `/academics/offerings/${id}?tab=attendance` },
     { key: "marks", label: "Internal marks", href: `/academics/offerings/${id}?tab=marks` },
+    { key: "live", label: "Live classes", href: `/academics/offerings/${id}?tab=live` },
   ];
   const [rooms, batches, terms] = await Promise.all([
     timetable ? db.room.findMany({ where: { isActive: true }, orderBy: { code: "asc" }, select: { id: true, code: true, capacity: true } }) : [],
@@ -116,6 +118,7 @@ export default async function OfferingPage({ params, searchParams }: { params: P
       {tab === "sessions" && <SessionsTab />}
       {tab === "attendance" && <AttendanceTab />}
       {tab === "marks" && <MarksTab />}
+      {tab === "live" && <LiveClassesPanel ctx={ctx} offeringId={id} teacher={manage || o.instructors.some((i) => i.user.id === ctx.user.id)} />}
     </div>
   );
 

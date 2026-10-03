@@ -17,6 +17,8 @@ import { dispatchNotifications } from "@/server/services/messaging";
 import { escalateOverdueGrievances } from "@/server/services/grievances";
 import { sendEventReminders } from "@/server/services/campus-events";
 import { deliverWebhooks } from "@/server/services/webhooks";
+import { sendMeetingReminders } from "@/server/services/video/meetings";
+import { applyVideoRetention } from "@/server/services/video/recordings";
 
 defineJob("workflow.escalate", async () => ({ escalated: await escalateOverdueTasks() }));
 defineJob("reminders.deadlines", async () => ({ sent: await sendDeadlineReminders() }));
@@ -30,3 +32,5 @@ defineJob("messaging.dispatch", async () => dispatchNotifications());
 defineJob("grievance.escalate", async () => ({ escalated: await escalateOverdueGrievances() }));
 defineJob("events.reminders", async () => ({ sent: await sendEventReminders() }));
 defineJob("webhooks.deliver", async () => deliverWebhooks());
+defineJob("video.reminders", async () => ({ sent: await sendMeetingReminders() }));
+defineJob("video.retention", async () => applyVideoRetention());

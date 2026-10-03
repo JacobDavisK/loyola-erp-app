@@ -2,9 +2,10 @@ import "server-only";
 import { examinationWhere, paperWhere, questionWhere } from "@/server/auth/access";
 import { type AuthContext, can } from "@/server/auth/current";
 import { db } from "@/server/db";
+import { meetingWhere } from "@/server/services/video/access";
 
 export interface SearchHit {
-  category: "Courses" | "Questions" | "Papers" | "Examinations" | "Users" | "Departments";
+  category: "Courses" | "Questions" | "Papers" | "Examinations" | "Users" | "Departments" | "Meetings";
   id: string;
   title: string;
   subtitle?: string;
@@ -68,6 +69,13 @@ export async function globalSearch(ctx: AuthContext, raw: string): Promise<Searc
             href: can(ctx, "admin.users.manage") ? `/admin/users/${u.id}` : `/setters?user=${u.id}`,
           })),
         ),
+    );
+  }
+  if (can(ctx, "video.join")) {
+    tasks.push(
+      db.videoMeeting
+        .findMany({ where: { AND: [meetingWhere(ctx), { status: { not: "DRAFT" } }, { OR: [{ title: contains }, { publicId: contains }, { offering: { course: { code: contains } } }] }] }, take: 5, orderBy: { scheduledStart: "desc" }, include: { _count: { select: { recordings: { where: { deletedAt: null, status: "AVAILABLE" } } } } } })
+        .then((r) => r.map((m) => ({ category: "Meetings" as const, id: m.id, title: m.title, subtitle: `${m.publicId} · ${m.status.toLowerCase()}${m._count.recordings ? " · recorded" : ""}`, href: `/video/${m.publicId}` }))),
     );
   }
   return (await Promise.all(tasks)).flat();

@@ -26,6 +26,8 @@ const PERIODIC: { type: string; everyMs: number }[] = [
   { type: "grievance.escalate", everyMs: 60 * 60_000 },
   { type: "events.reminders", everyMs: 60 * 60_000 },
   { type: "webhooks.deliver", everyMs: 30_000 },
+  { type: "video.reminders", everyMs: 60_000 },
+  { type: "video.retention", everyMs: 24 * 3_600_000 },
 ];
 let stopping = false;
 

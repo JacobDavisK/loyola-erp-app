@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { CalendarDays, ClipboardCheck, GraduationCap, Percent, Wallet } from "lucide-react";
+import { CalendarDays, ClipboardCheck, GraduationCap, Percent, Video, Wallet } from "lucide-react";
 import { formatMoney } from "@/lib/domain/money";
 import { studentBalance } from "@/server/services/finance-core";
 import type { Metadata } from "next";
@@ -11,9 +11,10 @@ import { Progress } from "@/components/ui/progress";
 import { STANDING_LABEL } from "@/lib/domain/attendance";
 import { STUDENT_STATUS } from "@/lib/domain/labels";
 import { isoWeekday } from "@/lib/domain/timetable";
-import { fmtDate, fmtDateTime, fmtDayZoned, fmtTime } from "@/lib/format";
+import { fmtDate, fmtDateTime, fmtDateTimeZoned, fmtDayZoned, fmtTime } from "@/lib/format";
+import { meetingList } from "@/features/video/data";
 import { cn } from "@/lib/utils";
-import { isSuperAdmin, requirePageAuth } from "@/server/auth/current";
+import { can, isSuperAdmin, requirePageAuth } from "@/server/auth/current";
 import { db } from "@/server/db";
 import { currentTerm } from "@/server/services/academic-setup";
 import { studentAttendance } from "@/server/services/attendance";
@@ -43,9 +44,10 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
     term && subject.canAcademic ? studentAttendance(ctx, s.id, term.id) : null,
     subject.canAcademic ? degreeProgress(ctx, s.id) : null,
     term ? db.timetableSlot.findMany({ where: { offering: { termId: term.id, status: { not: "CANCELLED" }, registrations: { some: { studentId: s.id, status: "REGISTERED" } } } }, include: { room: { select: { code: true } }, offering: { select: { section: true, course: { select: { code: true, title: true } } } } } }) : [],
-    db.classMeeting.findMany({ where: { date: new Date(`${todayYmd}T00:00:00Z`), status: { not: "CANCELLED" }, offering: { registrations: { some: { studentId: s.id, status: "REGISTERED" } } } }, include: { room: { select: { code: true } }, offering: { select: { course: { select: { code: true, title: true } } } } }, orderBy: { startsAt: "asc" } }),
+    db.classMeeting.findMany({ where: { date: new Date(`${todayYmd}T00:00:00Z`), status: { not: "CANCELLED" }, offering: { registrations: { some: { studentId: s.id, status: "REGISTERED" } } } }, include: { room: { select: { code: true } }, videoMeeting: { select: { publicId: true, status: true } }, offering: { select: { course: { select: { code: true, title: true } } } } }, orderBy: { startsAt: "asc" } }),
     db.calendarEvent.findMany({ where: { endDate: { gte: new Date(`${todayYmd}T00:00:00Z`) }, startDate: { lte: new Date(now.getTime() + 45 * 86_400_000) } }, orderBy: { startDate: "asc" }, take: 6 }),
   ]);
+  const online = subject.isSelf && can(ctx, "video.join") ? await meetingList(ctx, "upcoming", {}, 5) : [];
   const fees = subject.canFinance ? await db.$transaction((tx) => studentBalance(tx, s.id)) : { outstanding: 0, overdue: 0 };
   const shortage = att?.classes.filter((c) => c.summary.standing === "SHORTAGE" || c.summary.standing === "CONDONABLE") ?? [];
   const regOpen = term && term.status === "REGISTRATION" && (!term.registrationClosesAt || term.registrationClosesAt > now);
@@ -112,7 +114,7 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
                     <li key={m.id} className={cn("flex items-center gap-3 py-2.5", m.endsAt < now && "opacity-60")}>
                       <span className="w-28 text-sm tabular">{fmtTime(m.startsAt, inst.timezone)}–{fmtTime(m.endsAt, inst.timezone)}</span>
                       <span className="flex-1 text-sm"><span className="font-mono text-xs text-muted-foreground">{m.offering.course.code}</span> {m.offering.course.title}</span>
-                      <span className="text-xs text-muted-foreground">{m.room?.code}</span>
+                      {m.videoMeeting && subject.isSelf && m.videoMeeting.status !== "CANCELLED" && m.endsAt >= now ? <Link href={`/meet/${m.videoMeeting.publicId}`} className="text-xs font-medium text-primary hover:underline">{t("Join online")}</Link> : <span className="text-xs text-muted-foreground">{m.room?.code}</span>}
                     </li>
                   ))}
                 </ul>
@@ -126,6 +128,20 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
               )}
             </Section>
           </div>
+
+          {online.length > 0 && (
+            <Section title={t("Live classes & meetings")} actions={<Link href="/video" className="text-sm font-medium text-primary hover:underline">{t("All meetings")}</Link>}>
+              <ul className="divide-y">
+                {online.map((m) => (
+                  <li key={m.id} className="flex flex-wrap items-center gap-3 py-2.5 text-sm">
+                    <Video className="size-4 text-muted-foreground" aria-hidden />
+                    <span className="min-w-0 flex-1"><Link href={`/video/${m.publicId}`} className="font-medium hover:text-primary">{m.title}</Link><span className="block text-xs text-muted-foreground">{fmtDateTimeZoned(m.scheduledStart, inst.timezone)}{m.status === "LIVE" ? ` · ${t("Live now")}` : ""}</span></span>
+                    {m.status === "LIVE" && <Link href={`/meet/${m.publicId}`} className="text-xs font-medium text-primary hover:underline">{t("Join")}</Link>}
+                  </li>
+                ))}
+              </ul>
+            </Section>
+          )}
 
           <Section title={t("Weekly timetable")} description={term?.name}>
             <WeekGrid highlightDay={isoWeekday(new Date(`${todayYmd}T00:00:00Z`))} items={slots.map((x) => ({ id: x.id, dayOfWeek: x.dayOfWeek, startTime: x.startTime, endTime: x.endTime, title: x.offering.course.code, subtitle: [x.offering.course.title, x.room?.code].filter(Boolean).join(" · "), tone: x.kind === "LAB" ? "lab" : "default" }))} />

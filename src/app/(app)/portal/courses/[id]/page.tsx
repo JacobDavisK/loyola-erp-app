@@ -6,6 +6,7 @@ import { DataTable, LinkTabs, Td } from "@/components/app/list";
 import { EmptyState, PageHeader, Section } from "@/components/app/page";
 import { reviewVisibility } from "@/lib/domain/lms";
 import { fmtDateTimeZoned } from "@/lib/format";
+import { LiveClassesPanel } from "@/features/video/live-classes";
 import { requirePageAuth } from "@/server/auth/current";
 import { db } from "@/server/db";
 import { getInstitution } from "@/server/services/directory";
@@ -25,7 +26,7 @@ export default async function StudentCoursePage({ params, searchParams }: { para
   const o = s.offering;
   const now = new Date();
   const { timezone: tz } = await getInstitution();
-  const tabs = [["content", "Content"], ["announcements", "Announcements"], ["assignments", "Assignments"], ["quizzes", "Quizzes"], ["grades", "Grades"]].map(([k, l]) => ({ key: k, label: l, href: `?tab=${k}` }));
+  const tabs = [["content", "Content"], ["announcements", "Announcements"], ["assignments", "Assignments"], ["quizzes", "Quizzes"], ["grades", "Grades"], ["live", "Live classes"]].map(([k, l]) => ({ key: k, label: l, href: `?tab=${k}` }));
 
   return (
     <div className="space-y-6">
@@ -36,6 +37,7 @@ export default async function StudentCoursePage({ params, searchParams }: { para
       {tab === "assignments" && <Assignments offeringId={id} studentId={studentId} tz={tz} now={now} />}
       {tab === "quizzes" && <Quizzes offeringId={id} studentId={studentId} tz={tz} now={now} />}
       {tab === "grades" && <Grades offeringId={id} studentId={studentId} now={now} />}
+      {tab === "live" && <LiveClassesPanel ctx={ctx} offeringId={id} teacher={false} />}
     </div>
   );
 }

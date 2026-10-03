@@ -1,11 +1,12 @@
 import {
-  Activity, Archive, Bell, BookOpen, Building2, CalendarDays, CalendarRange, ChartLine, ClipboardList,
+  Video, MonitorPlay, Activity, Archive, Bell, BookOpen, Building2, CalendarDays, CalendarRange, ChartLine, ClipboardList,
   FileBarChart, FileText, History, Inbox, LayoutDashboard, Library, ListChecks, Package, Palette, Ruler,
   ScanSearch, Settings, ShieldCheck, Stamp, Tags, UsersRound, Circle, GraduationCap, Upload, School, CalendarClock, Route, DoorOpen,
   Presentation, Percent, ClipboardCheck, Ticket, Award, PenLine, RefreshCcw, Wallet, Banknote, Briefcase, CalendarOff, UserCheck, Contact, FlaskConical, BadgeCheck, Megaphone, LifeBuoy, BedDouble, Bus, UserPlus, Landmark, Target, LogOut, FileCheck, LockKeyhole, Bot, Scale, IdCard, HeartHandshake, ShoppingCart, Boxes, Monitor, PiggyBank, CalendarCheck, ShieldHalf, Stethoscope, DoorClosed, type LucideIcon,
 } from "lucide-react";
 
 const MAP: Record<string, LucideIcon> = {
+  video: Video, "monitor-play": MonitorPlay,
   activity: Activity, archive: Archive, bell: Bell, "book-open": BookOpen, "building-2": Building2,
   "calendar-days": CalendarDays, "calendar-range": CalendarRange, "chart-line": ChartLine,
   "clipboard-list": ClipboardList, "file-bar-chart": FileBarChart, "file-text": FileText, history: History,

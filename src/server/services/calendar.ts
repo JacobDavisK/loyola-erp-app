@@ -6,6 +6,7 @@ import { db } from "@/server/db";
 import { env } from "@/server/env";
 import { randomToken, sha256 } from "@/server/security/crypto";
 import { audit } from "@/server/services/audit";
+import { meetingWhere } from "@/server/services/video/access";
 
 /**
  * Private calendar subscription. Each person can create a secret link that Google Calendar, Outlook or a
@@ -28,15 +29,19 @@ export async function calendarFor(ctx: AuthContext, now = new Date()): Promise<C
   const from = new Date(now.getTime() - 14 * 86_400_000);
   const to = new Date(now.getTime() + 120 * 86_400_000);
   const self = ctx.subject.studentId;
-  const [classes, exams, assignments, events, bookings] = await Promise.all([
+  const [classes, exams, assignments, events, bookings, meetings] = await Promise.all([
     db.classMeeting.findMany({ where: { status: { not: "CANCELLED" }, startsAt: { gte: from, lt: to }, offering: offeringWhere(ctx) }, include: { offering: { include: { course: { select: { code: true, title: true } } } }, room: { select: { code: true, name: true } } }, take: 2000 }),
     self ? db.examRegistration.findMany({ where: { studentId: self, examination: { schedule: { startsAt: { gte: from, lt: to } } } }, include: { examination: { include: { course: { select: { code: true, title: true } }, schedule: true } } } }) : [],
     self ? db.assignment.findMany({ where: { publishedAt: { not: null }, dueAt: { gte: from, lt: to }, offering: { registrations: { some: { studentId: self, status: { in: ["REGISTERED", "COMPLETED"] } } } } }, include: { offering: { include: { course: { select: { code: true } } } } } }) : [],
     db.eventRegistration.findMany({ where: { userId: ctx.user.id, event: { status: { in: ["PUBLISHED", "COMPLETED"] }, startsAt: { gte: from, lt: to } } }, include: { event: true } }),
     db.facilityBooking.findMany({ where: { bookedById: ctx.user.id, status: "APPROVED", startsAt: { gte: from, lt: to } }, include: { room: { select: { code: true, name: true } } } }),
+    // Online meetings I host or am invited to (online classes for a timetabled session appear as that class)
+    db.videoMeeting.findMany({ where: { AND: [meetingWhere(ctx), { status: { in: ["SCHEDULED", "STARTING", "LIVE", "ENDED"] }, scheduledStart: { gte: from, lt: to } }, { OR: [{ hostUserId: ctx.user.id }, { participants: { some: { userId: ctx.user.id, connectionStatus: { not: "REMOVED" }, invitationStatus: { not: "DECLINED" } } } }] }] }, take: 1000 }),
   ]);
+  const online = new Map(meetings.filter((m) => m.classMeetingId).map((m) => [m.classMeetingId!, m.publicId]));
   return [
-    ...classes.map((m) => ({ uid: `class-${m.id}@erp`, title: `${m.offering.course.code} ${m.offering.course.title}`, startsAt: m.startsAt, endsAt: m.endsAt, location: m.room ? `${m.room.code} ${m.room.name}` : null })),
+    ...classes.map((m) => ({ uid: `class-${m.id}@erp`, title: `${m.offering.course.code} ${m.offering.course.title}`, startsAt: m.startsAt, endsAt: m.endsAt, location: online.has(m.id) ? "Online" : m.room ? `${m.room.code} ${m.room.name}` : null, description: online.has(m.id) ? `Join online: ${env.APP_URL}/meet/${online.get(m.id)}` : null })),
+    ...meetings.filter((m) => !m.classMeetingId).map((m) => ({ uid: `meeting-${m.id}@erp`, title: m.title, startsAt: m.scheduledStart, endsAt: m.scheduledEnd, location: "Online", description: `Meeting ID ${m.publicId} — join: ${env.APP_URL}/meet/${m.publicId}` })),
     ...exams.filter((r) => r.examination.schedule).map((r) => ({ uid: `exam-${r.id}@erp`, title: `Examination: ${r.examination.course.code} ${r.examination.course.title}`, startsAt: r.examination.schedule!.startsAt, endsAt: r.examination.schedule!.endsAt, location: r.examination.schedule!.venue, description: r.hallTicketNo ? `Hall ticket ${r.hallTicketNo}` : null })),
     ...assignments.map((a) => ({ uid: `assignment-${a.id}@erp`, title: `Due: ${a.offering.course.code} — ${a.title}`, startsAt: new Date(a.dueAt.getTime() - 30 * 60_000), endsAt: a.dueAt })),
     ...events.map((r) => ({ uid: `event-${r.event.id}@erp`, title: r.event.title, startsAt: r.event.startsAt, endsAt: r.event.endsAt, location: r.event.venue })),

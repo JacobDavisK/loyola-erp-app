@@ -15,6 +15,7 @@ import { seedTeaching } from "./seed-teaching";
 import { seedCredentials } from "./seed-credentials";
 import { seedCampusLife } from "./seed-campuslife";
 import { seedOperations } from "./seed-operations";
+import { seedVideo } from "./seed-video";
 
 export interface SeedContext {
   db: PrismaClient;
@@ -367,6 +368,7 @@ async function seedAcademicCore(s: SeedContext, campus: { main: string; city: st
   await seedCredentials(s);
   await seedCampusLife(s);
   await seedOperations(s);
+  await seedVideo(s);
 }
 
 // ───────────────────────── Phase 3: grading, valuers, marks, published history ─────────────────────────
